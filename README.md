@@ -64,7 +64,7 @@ Email:    admin@toptunes.dev
 Password: admin1234
 Role:     admin
 ```
-*Admins see an "Admin" entry in navigation allowing them to upload local audio files (.mp3, .wav, .m4a), cover art, and manage songs.*
+*Admins see an "Admin" entry in navigation allowing them to upload local audio files (.mp3, .wav, .m4a), auto-extract embedded ID3 album art & tags (or upload custom cover art), and manage songs.*
 
 ### 2. Listener Account (Normal User)
 ```text
@@ -133,9 +133,10 @@ The AngularJS SPA communicates with the Express API under `/api`.
 | GET | `/api/search` | Public | Unified search |
 | GET | `/api/stats/me` | User | User profile statistics |
 | POST | `/api/admin/songs` | Admin | Create catalog song |
+| POST | `/api/admin/songs/inspect-audio` | Admin | Inspect ID3 tags & embedded cover art |
 | PATCH | `/api/admin/songs/:id` | Admin | Update song metadata |
 | DELETE | `/api/admin/songs/:id` | Admin | Delete song & cascade cleanup |
-| POST | `/api/admin/songs/:id/audio` | Admin | Upload audio track file |
+| POST | `/api/admin/songs/:id/audio` | Admin | Upload audio track file (auto-extracts cover if present) |
 | POST | `/api/admin/songs/:id/cover` | Admin | Upload cover image file |
 
 ## Testing

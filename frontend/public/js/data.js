@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var genres = ['Pop', 'Rock', 'Hip-Hop', 'Electronic', 'Jazz', 'Lo-fi'];
+  var genres = ['Pop', 'Electronic', 'Tamil', 'Phonk', 'J-Rock', 'Hip-Hop', 'Indie', 'K-Pop', 'R&B', 'Rock'];
   var emptyState = { likes: [], library: [], albums: [], playlists: [], history: [], plays: {}, listened: 0, nextPid: 1 };
 
   angular.module('topTunes.data', []).constant('SEED', {

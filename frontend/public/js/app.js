@@ -122,25 +122,42 @@
     }
 
     return {
-      // GET /api/catalog
+      // GET /api/catalog with local storage caching
       getCatalog: function () {
-        return $http.get(API_BASE + '/catalog').then(extract).catch(function () {
-          return angular.copy(SEED.catalog);
+        return $http.get(API_BASE + '/catalog').then(function (res) {
+          var data = extract(res);
+          localSet('tt_cached_catalog', data);
+          return data;
+        }).catch(function () {
+          var cached = localGet('tt_cached_catalog', null);
+          return cached || angular.copy(SEED.catalog);
         });
       },
 
-      // GET /api/browse
+      // GET /api/browse with local storage caching
       getBrowse: function () {
-        return $http.get(API_BASE + '/browse').then(extract).catch(handleErr);
+        return $http.get(API_BASE + '/browse').then(function (res) {
+          var data = extract(res);
+          localSet('tt_cached_browse', data);
+          return data;
+        }).catch(function (err) {
+          var cached = localGet('tt_cached_browse', null);
+          if (cached) return cached;
+          return handleErr(err);
+        });
       },
 
-      // GET /api/library (for user) or localStorage (for guest)
+      // GET /api/library (for user) or localStorage (for guest) with full offline caching
       getState: function (key) {
         var token = null;
         try { token = $window.localStorage.getItem('tt_token'); } catch (e) {}
 
         if (token && key && key !== 'guest') {
-          return $http.get(API_BASE + '/library').then(extract).catch(function () {
+          return $http.get(API_BASE + '/library').then(function (res) {
+            var data = extract(res);
+            localSet('tt_state_' + key, data);
+            return data;
+          }).catch(function () {
             var saved = localGet('tt_state_' + key, null);
             return saved || angular.copy(SEED.emptyState);
           });
@@ -258,6 +275,11 @@
       adminDeleteSong: function (id) {
         return $http.delete(API_BASE + '/admin/songs/' + id).then(extract).catch(handleErr);
       },
+      adminInspectAudio: function (formData) {
+        return $http.post(API_BASE + '/admin/songs/inspect-audio', formData, {
+          headers: { 'Content-Type': undefined }
+        }).then(extract).catch(handleErr);
+      },
       adminUploadAudio: function (id, formData) {
         return $http.post(API_BASE + '/admin/songs/' + id + '/audio', formData, {
           headers: { 'Content-Type': undefined }
@@ -267,6 +289,12 @@
         return $http.post(API_BASE + '/admin/songs/' + id + '/cover', formData, {
           headers: { 'Content-Type': undefined }
         }).then(extract).catch(handleErr);
+      },
+      adminCreateGenre: function (data) {
+        return $http.post(API_BASE + '/admin/genres', data).then(extract).catch(handleErr);
+      },
+      adminDeleteGenre: function (id) {
+        return $http.delete(API_BASE + '/admin/genres/' + id).then(extract).catch(handleErr);
       }
     };
   }]);
@@ -288,17 +316,31 @@
   }]);
 
   /* ================= Catalog ================= */
-  app.factory('Catalog', ['Api', function (Api) {
+  app.factory('Catalog', ['$window', 'Api', 'SEED', function ($window, Api, SEED) {
     var C = { songs: [], albums: [], genres: [], _s: {}, _a: {} };
+
+    function populate(c) {
+      if (!c) return;
+      C.songs = c.songs || [];
+      C.albums = c.albums || [];
+      C.genres = (c.genres || []).map(function (g) { return typeof g === 'object' ? g.name : g; });
+      C._s = {};
+      C._a = {};
+      (c.songs || []).forEach(function (s) { C._s[s.id] = s; });
+      (c.albums || []).forEach(function (a) { C._a[a.id] = a; });
+    }
+
+    // Pre-populate synchronously from local cache so view renders with zero lag
+    try {
+      var cached = JSON.parse($window.localStorage.getItem('tt_cached_catalog'));
+      populate(cached || SEED.catalog);
+    } catch (e) {
+      populate(SEED.catalog);
+    }
+
     C.load = function () {
       return Api.getCatalog().then(function (c) {
-        C.songs = c.songs || [];
-        C.albums = c.albums || [];
-        C.genres = (c.genres || []).map(function (g) { return typeof g === 'object' ? g.name : g; });
-        C._s = {};
-        C._a = {};
-        (c.songs || []).forEach(function (s) { C._s[s.id] = s; });
-        (c.albums || []).forEach(function (a) { C._a[a.id] = a; });
+        populate(c);
         return C;
       });
     };
@@ -639,7 +681,7 @@
   }]);
 
   /* ================= Player (HTML5 audio playback with API sync) ================= */
-  app.factory('Player', ['$interval', '$timeout', '$rootScope', 'Library', 'Session', 'Api', 'Toast', function ($interval, $timeout, $rootScope, Library, Session, Api, Toast) {
+  app.factory('Player', ['$window', '$interval', '$timeout', '$rootScope', 'Library', 'Session', 'Api', 'Toast', function ($window, $interval, $timeout, $rootScope, Library, Session, Api, Toast) {
     var P = {
       queue: [], original: null, index: -1, current: null,
       playing: false, position: 0, shuffle: false, repeat: 'off',
@@ -676,6 +718,19 @@
     };
 
     function debouncedSaveQueue() {
+      // Always persist locally for instant reload & offline playback
+      try {
+        var localQueueState = {
+          queue: (P.queue || []).map(function (s) { return s.id; }),
+          index: P.index,
+          position: P.position,
+          shuffle: P.shuffle,
+          repeat: P.repeat,
+          volume: P.volume || 80
+        };
+        $window.localStorage.setItem('tt_queue_state', JSON.stringify(localQueueState));
+      } catch (e) {}
+
       if (Session.user) {
         if (saveQueueTimeout) { $timeout.cancel(saveQueueTimeout); }
         saveQueueTimeout = $timeout(function () {
@@ -1218,6 +1273,7 @@
     vm.error = '';
     vm.emailRule = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.(com|net|org|edu|gov|mil|biz|info|io|ai|co|me|dev|app|xyz|tech|site|online|top|music|audio|media|live|cloud|tv|in|us|uk|ca|de|fr|jp|au|it|es|nl|eu|ch|se|no|fi|ru|br|za|kr|mx|nz|sg|is|agency|store|space|digital|global)$/i;
     vm.demo = function () { vm.user.email = 'demo@toptunes.dev'; vm.user.password = 'demo1234'; vm.error = ''; };
+    vm.admin = function () { vm.user.email = 'admin@toptunes.dev'; vm.user.password = 'admin1234'; vm.error = ''; };
     vm.submit = function (form) {
       vm.error = '';
       if (!form || form.$invalid) {
@@ -1318,10 +1374,49 @@
     };
     vm.audioFile = null;
     vm.coverFile = null;
+    vm.inspectingAudio = false;
+    vm.embeddedCoverPreview = null;
+    vm.editEmbeddedCoverPreview = null;
 
     vm.setAudioFile = function (file) {
       $scope.$applyAsync(function () {
         vm.audioFile = file;
+        vm.embeddedCoverPreview = null;
+        if (!file) return;
+
+        // Automatically inspect audio tags and embedded album art
+        vm.inspectingAudio = true;
+        var fd = new FormData();
+        fd.append('audio', file);
+        Api.adminInspectAudio(fd).then(function (res) {
+          if (res) {
+            if (res.title && (!vm.newSong.title || vm.newSong.title === '')) {
+              vm.newSong.title = res.title;
+            }
+            if (res.artist && (!vm.newSong.artist || vm.newSong.artist === '')) {
+              vm.newSong.artist = res.artist;
+            }
+            if (res.album && (!vm.newSong.album || vm.newSong.album === '')) {
+              vm.newSong.album = res.album;
+            }
+            if (res.genre && vm.catalog.genres && vm.catalog.genres.indexOf(res.genre) !== -1) {
+              vm.newSong.genre = res.genre;
+            }
+            if (res.duration) {
+              vm.newSong.duration = res.duration;
+            }
+            if (res.hasCover && res.coverBase64) {
+              vm.embeddedCoverPreview = res.coverBase64;
+              Toast.info('Embedded cover art & ID3 metadata detected from audio file!');
+            } else if (res.title || res.artist) {
+              Toast.info('Track details auto-filled from audio tags.');
+            }
+          }
+        }).catch(function (err) {
+          console.warn('[TopTunes] Audio inspection skipped:', err);
+        }).finally(function () {
+          vm.inspectingAudio = false;
+        });
       });
     };
 
@@ -1334,6 +1429,22 @@
     vm.setEditAudioFile = function (file) {
       $scope.$applyAsync(function () {
         vm.editAudioFile = file;
+        vm.editEmbeddedCoverPreview = null;
+        if (!file) return;
+
+        var fd = new FormData();
+        fd.append('audio', file);
+        Api.adminInspectAudio(fd).then(function (res) {
+          if (res && res.hasCover && res.coverBase64) {
+            vm.editEmbeddedCoverPreview = res.coverBase64;
+            Toast.info('Embedded cover art detected in audio file.');
+          }
+          if (res && res.duration && vm.editingSong) {
+            vm.editingSong.duration = res.duration;
+          }
+        }).catch(function (err) {
+          console.warn('[TopTunes] Audio inspection skipped:', err);
+        });
       });
     };
 
@@ -1381,6 +1492,8 @@
       vm.newSong = { title: '', artist: '', album: '', genre: 'Pop', duration: 180, available: true };
       vm.audioFile = null;
       vm.coverFile = null;
+      vm.inspectingAudio = false;
+      vm.embeddedCoverPreview = null;
       var aInp = document.getElementById('adminAudioInput');
       var cInp = document.getElementById('adminCoverInput');
       if (aInp) aInp.value = '';
@@ -1392,12 +1505,14 @@
       vm.editingSong = angular.copy(s);
       vm.editAudioFile = null;
       vm.editCoverFile = null;
+      vm.editEmbeddedCoverPreview = null;
     };
 
     vm.cancelEdit = function () {
       vm.editingSong = null;
       vm.editAudioFile = null;
       vm.editCoverFile = null;
+      vm.editEmbeddedCoverPreview = null;
     };
 
     vm.saveEdit = function () {
@@ -1453,6 +1568,46 @@
         Toast.error(err.message || 'Could not delete song.');
       }).finally(function () {
         vm.busy = false;
+      });
+    };
+
+    vm.newGenreName = '';
+    vm.newGenreColor = '#ffb224';
+    vm.addingGenre = false;
+
+    vm.addGenre = function () {
+      if (!vm.newGenreName || !vm.newGenreName.trim()) {
+        Toast.error('Please enter a genre name.');
+        return;
+      }
+      vm.addingGenre = true;
+      Api.adminCreateGenre({ name: vm.newGenreName.trim(), color: vm.newGenreColor }).then(function (res) {
+        Toast.success('Genre "' + (res.genre ? res.genre.name : vm.newGenreName) + '" added to catalog.');
+        vm.newGenreName = '';
+        return Catalog.load();
+      }).catch(function (err) {
+        Toast.error(err.message || 'Could not create genre.');
+      }).finally(function () {
+        vm.addingGenre = false;
+      });
+    };
+
+    vm.removeGenre = function (g) {
+      if (!g) return;
+      Api.catalog().then(function (c) {
+        var found = (c.genres || []).find(function (item) {
+          return (typeof item === 'object' && item.name === g) || item === g;
+        });
+        if (found && found.id) {
+          return Api.adminDeleteGenre(found.id).then(function () {
+            Toast.success('Genre "' + g + '" removed.');
+            return Catalog.load();
+          });
+        } else {
+          Toast.error('Could not locate genre record.');
+        }
+      }).catch(function (err) {
+        Toast.error(err.message || 'Could not remove genre.');
       });
     };
   }]);

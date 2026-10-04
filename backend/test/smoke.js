@@ -154,6 +154,39 @@ async function runTests() {
     }
     console.log('✅ 2.4 Admin successfully updated song metadata');
 
+    // 2.5 Admin Can Create and Delete Custom Genres
+    const createGenreRes = await makeRequest(server, {
+      path: '/api/admin/genres',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` }
+    }, { name: 'Synthwave', color: '#ec4899' });
+    if (createGenreRes.status !== 201 || !createGenreRes.body.data.genre.id) {
+      throw new Error(`Admin create genre failed: ${JSON.stringify(createGenreRes.body)}`);
+    }
+    const createdGenreId = createGenreRes.body.data.genre.id;
+    console.log(`✅ 2.5 Admin successfully created new genre "${createGenreRes.body.data.genre.name}"`);
+
+    // Verify all 10 core genres exist in catalog
+    const catalogRes = await makeRequest(server, { path: '/api/catalog', method: 'GET' });
+    const genreNames = (catalogRes.body.data.genres || []).map(g => g.name);
+    const requiredGenres = ['Pop', 'Electronic', 'Tamil', 'Phonk', 'J-Rock', 'Hip-Hop', 'Indie', 'K-Pop', 'R&B', 'Rock'];
+    for (const rg of requiredGenres) {
+      if (!genreNames.includes(rg)) {
+        throw new Error(`Required genre "${rg}" is missing from catalog! Found: ${genreNames.join(', ')}`);
+      }
+    }
+    console.log(`✅ 2.6 Verified all 10 required genres exist in catalog: ${requiredGenres.join(', ')}`);
+
+    const delGenreRes = await makeRequest(server, {
+      path: `/api/admin/genres/${createdGenreId}`,
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (delGenreRes.status !== 200) {
+      throw new Error(`Admin delete genre failed: ${JSON.stringify(delGenreRes.body)}`);
+    }
+    console.log('✅ 2.7 Admin successfully deleted custom genre');
+
     // ==========================================
     // 3. PLAYLISTS, LIKES, & CASCADE INTEGRITY
     // ==========================================
