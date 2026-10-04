@@ -13,6 +13,8 @@ CORE_CODE_FILES = [
 
     # Frontend Assets & App
     "frontend/public/index.html",
+    "frontend/public/site.webmanifest",
+    "frontend/public/favicon.svg",
     "frontend/public/css/styles.css",
     "frontend/public/js/app.js",
     "frontend/public/js/data.js",
