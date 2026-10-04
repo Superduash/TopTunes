@@ -9,6 +9,7 @@ node_modules/
 _archive/
 scratch/
 screenshots/
+code.txt
 
 # System and editor files
 .DS_Store

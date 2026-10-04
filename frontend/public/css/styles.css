@@ -145,6 +145,12 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   color: var(--text);
   margin: 0;
+  outline: none;
+}
+
+h1:focus, h1[tabindex="-1"]:focus, [tabindex="-1"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 h1 {
