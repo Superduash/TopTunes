@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="topTunes" ng-strict-di>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title ng-bind="title">TopTunes</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffb224'/%3E%3Cpath d='M9 22V10m5 12V6m5 16V13m5 9V9' stroke='%230f1220' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/fonts/fonts.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body ng-controller="AppCtrl as app" ng-class="{'has-player': app.player.current}" ng-keydown="app.onKey($event)" ng-cloak>
+
+<!-- Icon sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5l10 7-10 7zM18 5v14"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 5L8 12l10 7zM6 5v14"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><path d="M5 4v16M10 4v16M15 6l4.5 14"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M4 7h12M4 12h12M4 17h7"/><circle cx="18" cy="17" r="2.5"/><path d="M20.5 17V9"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1-4 4-6 8-6s7 2 8 6"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3c5 0 5 10 10 10h3M4 17h3c1.5 0 2.600-.8 3.500-2M14 9c.9-1.200 2-2 3.500-2H20M17.500 4.500L20 7l-2.500 2.500M17.500 14.500L20 17l-2.500 2.500"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M5 11V9a3 3 0 0 1 3-3h11M16 3l3 3-3 3M19 13v2a3 3 0 0 1-3 3H5M8 21l-3-3 3-3"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path d="M4 6h12M4 11h12M4 16h6M15 14l5 3-5 3z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M5 19l1-4L16 5l3 3L9 18z"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div class="loadbar" ng-class="{on: app.loading}" role="progressbar" aria-label="Loading content" ng-attr-aria-valuenow="{{app.loading ? 100 : 0}}"></div>
+
+<header class="topbar">
+  <a class="brand" href="#/home"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 22V10m5 12V6m5 16V13m5 9V9"/></svg>TopTunes</a>
+  <a class="btn small" href="#/login" ng-if="!app.session.user">Log in</a>
+  <a class="avatar" href="#/profile" ng-if="app.session.user" aria-label="Your profile">{{app.session.user.name | initials}}</a>
+</header>
+
+<div class="shell">
+  <aside class="side" role="navigation" aria-label="Sidebar navigation">
+    <a class="brand" href="#/home" aria-label="TopTunes Home">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 22V10m5 12V6m5 16V13m5 9V9"/></svg>
+      <span>TopTunes</span>
+    </a>
+
+    <div class="side-content">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a ng-repeat="n in app.primaryNav" ng-href="#{{n.path}}" ng-class="{on: app.isActive(n.path)}" ng-attr-aria-current="{{app.isActive(n.path) ? 'page' : undefined}}">
+          <svg class="i"><use ng-attr-href="#i-{{n.icon}}"/></svg><span>{{n.label}}</span>
+        </a>
+      </nav>
+
+      <div class="side-playlists" ng-if="app.lib.state.playlists.length">
+        <div class="side-playlists-head">
+          <span>Playlists</span>
+          <a class="icon-btn-sm" href="#/playlists" aria-label="Create or manage playlists"><svg class="i"><use href="#i-plus"/></svg></a>
+        </div>
+        <div class="side-playlists-list">
+          <a ng-repeat="p in app.lib.state.playlists" ng-href="#/playlists/{{p.id}}" ng-class="{on: app.isPath('/playlists/' + p.id)}">
+            <span class="side-pl-dot"></span>
+            <span class="side-pl-name">{{p.name}}</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile bottom tab bar nav (visible only <= 860px) -->
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a ng-repeat="n in app.nav" ng-href="#{{n.path}}" ng-class="{on: app.isActive(n.path)}" ng-attr-aria-current="{{app.isActive(n.path) ? 'page' : undefined}}">
+        <svg class="i"><use ng-attr-href="#i-{{n.icon}}"/></svg><span>{{n.label}}</span>
+      </a>
+    </nav>
+
+    <div class="account">
+      <div ng-if="app.session.user">
+        <a class="who" href="#/profile" aria-label="Your profile">
+          <span class="avatar">{{app.session.user.name | initials}}</span>
+          <div class="who-meta">
+            <strong>{{app.session.user.name}}</strong>
+            <small>Profile & Settings</small>
+          </div>
+        </a>
+        <button class="linkish log-btn" ng-click="app.logout()">Log out</button>
+      </div>
+      <div ng-if="!app.session.user" class="guest">
+        <p>Browsing as a guest.</p>
+        <div class="guest-btns">
+          <a class="btn primary small" href="#/login">Log in</a>
+          <a class="btn small" href="#/register">Sign up</a>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="main" role="main" tabindex="-1" ng-view autoscroll="true"></main>
+</div>
+
+<!-- Player -->
+<footer class="player" ng-if="app.player.current" ng-class="{expanded: app.player.expanded}" role="region" aria-label="Audio player">
+  <!-- Mobile Expanded Header -->
+  <div class="player-expanded-head">
+    <button class="icon-btn collapse-btn" ng-click="app.player.expanded = false" aria-label="Collapse player">
+      <svg class="i"><use href="#i-chevron-down"/></svg>
+    </button>
+    <div class="expanded-head-title">
+      <span class="kind-badge">NOW PLAYING</span>
+      <strong>{{app.player.current.album || 'TopTunes'}}</strong>
+    </div>
+    <button class="icon-btn" ng-class="{on: app.player.open}" ng-click="app.player.open = !app.player.open" aria-label="Show queue" aria-pressed="{{app.player.open}}">
+      <svg class="i"><use href="#i-queue"/></svg><b class="badge" ng-if="app.player.upcoming()">{{app.player.upcoming()}}</b>
+    </button>
+  </div>
+
+  <div class="np" ng-click="app.toggleExpand()" role="button" tabindex="0" aria-label="Expand player">
+    <tt-cover item="app.player.current" class="sm player-art"></tt-cover>
+    <div class="np-meta">
+      <strong>{{app.player.current.title}}</strong>
+      <span>{{app.player.current.artist}}</span>
+    </div>
+    <button class="icon-btn like" ng-click="$event.stopPropagation(); app.lib.toggleLike(app.player.current)" ng-class="{on: app.lib.isLiked(app.player.current.id)}" aria-label="{{app.lib.isLiked(app.player.current.id) ? 'Unlike current song' : 'Like current song'}}">
+      <svg class="i"><use href="#i-heart"/></svg>
+    </button>
+  </div>
+
+  <div class="ctrl">
+    <div class="btns">
+      <button class="icon-btn opt" ng-class="{on: app.player.shuffle}" ng-click="app.player.toggleShuffle()" aria-label="Shuffle" aria-pressed="{{app.player.shuffle}}">
+        <svg class="i"><use href="#i-shuffle"/></svg>
+      </button>
+      <button class="icon-btn prev-btn" ng-click="app.player.prev()" aria-label="Previous song">
+        <svg class="i fill"><use href="#i-prev"/></svg>
+      </button>
+      <button class="play-btn" ng-click="app.player.toggle()" ng-attr-aria-label="{{app.player.playing ? 'Pause' : 'Play'}}">
+        <svg class="i fill"><use ng-attr-href="{{app.player.playing ? '#i-pause' : '#i-play'}}"/></svg>
+      </button>
+      <button class="icon-btn next-btn" ng-click="app.player.next()" aria-label="Next song">
+        <svg class="i fill"><use href="#i-next"/></svg>
+      </button>
+      <button class="icon-btn opt" ng-class="{on: app.player.repeat !== 'off'}" ng-click="app.player.cycleRepeat()" ng-attr-aria-label="Repeat mode: {{app.player.repeat}}" ng-attr-title="Repeat: {{app.player.repeat}}">
+        <svg class="i"><use href="#i-repeat"/></svg>
+        <b class="one" ng-if="app.player.repeat === 'one'">1</b>
+      </button>
+    </div>
+    <div class="scrub">
+      <span class="t">{{app.player.position | duration}}</span>
+      <input type="range" class="seek-range" min="0" step="any" ng-attr-max="{{app.player.current.duration}}" ng-model="app.player.position" ng-change="app.player.seek(app.player.position)" ng-style="{'--p': (app.player.position / app.player.current.duration * 100) + '%'}" aria-label="Seek track position">
+      <span class="t">{{app.player.current.duration | duration}}</span>
+    </div>
+  </div>
+
+  <div class="extra">
+    <div class="vol-wrap" title="Volume">
+      <button class="icon-btn" ng-click="app.player.toggleMute()" ng-attr-aria-label="{{app.player.muted ? 'Unmute' : 'Mute'}}">
+        <svg class="i"><use ng-attr-href="{{app.player.muted || app.player.volume === 0 ? '#i-mute' : '#i-volume'}}"/></svg>
+      </button>
+      <input type="range" class="vol-range" min="0" max="100" ng-model="app.player.volume" ng-change="app.player.setVolume(app.player.volume)" ng-style="{'--p': app.player.volume + '%'}" aria-label="Volume">
+    </div>
+    <button class="icon-btn queue-toggle-btn" ng-class="{on: app.player.open}" ng-click="app.player.open = !app.player.open" aria-label="Show queue" aria-pressed="{{app.player.open}}">
+      <svg class="i"><use href="#i-queue"/></svg><b class="badge" ng-if="app.player.upcoming()">{{app.player.upcoming()}}</b>
+    </button>
+  </div>
+</footer>
+
+<!-- Queue drawer -->
+<aside class="queue" role="complementary" ng-class="{open: app.player.open}" aria-label="Play queue" ng-attr-aria-hidden="{{!app.player.open}}">
+  <header>
+    <h2>Queue</h2>
+    <button class="linkish" ng-click="app.player.clearUpcoming()" ng-disabled="!app.player.upcoming()">Clear upcoming</button>
+    <button class="icon-btn" ng-click="app.player.open = false" aria-label="Close queue"><svg class="i"><use href="#i-x"/></svg></button>
+  </header>
+  <div class="empty" ng-if="!app.player.current"><strong>Your queue is empty</strong><p>Play any song and the rest of the list lines up here.</p></div>
+  <ol ng-if="app.player.current">
+    <li ng-repeat="s in app.player.queue" ng-class="{now: $index === app.player.index, past: $index < app.player.index}">
+      <button class="q-main" ng-click="app.player.playAt($index)">
+        <tt-cover item="s" class="xs"></tt-cover>
+        <span><strong>{{s.title}}</strong><em>{{s.artist}}</em></span>
+      </button>
+      <span class="t">{{s.duration | duration}}</span>
+      <button class="icon-btn" ng-if="$index !== app.player.index" ng-click="app.player.removeAt($index)" ng-attr-aria-label="Remove {{s.title}} from queue"><svg class="i"><use href="#i-x"/></svg></button>
+      <span class="icon-btn ph" ng-if="$index === app.player.index"></span>
+    </li>
+  </ol>
+</aside>
+<div class="queue-backdrop" ng-class="{open: app.player.open}" ng-click="app.player.open = false" aria-hidden="true"></div>
+
+<!-- Toasts -->
+<div class="toasts" aria-live="polite">
+  <div class="toast" ng-class="t.type" ng-repeat="t in app.toast.items track by t.id">
+    <span>{{t.msg}}</span>
+    <button ng-click="app.toast.dismiss(t)" aria-label="Dismiss message"><svg class="i"><use href="#i-x"/></svg></button>
+  </div>
+</div>
+
+<!-- ============ Templates ============ -->
+<script type="text/ng-template" id="chips.html">
+  <div class="chips" role="group" aria-label="Filter by genre">
+    <button class="chip" ng-class="{on: !vm.genre}" ng-click="vm.pick('')">All</button>
+    <button class="chip" ng-repeat="g in vm.genres" ng-class="{on: vm.genre === g}" ng-click="vm.pick(g)" aria-pressed="{{vm.genre === g}}">{{g}}</button>
+  </div>
+</script>
+
+<script type="text/ng-template" id="albumcard.html">
+  <div class="card card-item">
+    <a class="card-link" ng-href="#/albums/{{a.id}}">
+      <div class="card-art-wrap">
+        <tt-cover item="a"></tt-cover>
+        <button class="card-play-btn" ng-click="vm.playAlbum ? vm.playAlbum(a, $event) : app.playAlbum(a, $event)" aria-label="Play album {{a.title}}">
+          <svg class="i fill"><use href="#i-play"/></svg>
+        </button>
+      </div>
+      <strong title="{{a.title}}">{{a.title}}</strong>
+      <span>{{a.artist}}</span>
+      <small>{{a.year}} • {{a.genre}}</small>
+    </a>
+  </div>
+</script>
+
+<script type="text/ng-template" id="playlistcard.html">
+  <div class="card card-item">
+    <a class="card-link" ng-href="#/playlists/{{p.id}}">
+      <div class="card-art-wrap">
+        <tt-cover item="p"></tt-cover>
+        <button class="card-play-btn" ng-if="p.songIds.length" ng-click="vm.playPlaylist ? vm.playPlaylist(p, $event) : app.playPlaylist(p, $event)" aria-label="Play playlist {{p.name}}">
+          <svg class="i fill"><use href="#i-play"/></svg>
+        </button>
+      </div>
+      <strong title="{{p.name}}">{{p.name}}</strong>
+      <span>{{p.songIds.length | plural:'song'}}</span>
+    </a>
+  </div>
+</script>
+
+<script type="text/ng-template" id="songrow.html">
+  <div class="song" ng-class="{playing: cur(), off: !song.available}" ng-attr-aria-disabled="{{!song.available ? 'true' : undefined}}">
+    <button class="song-idx" ng-click="play()" ng-attr-aria-label="{{cur() && player.playing ? 'Pause' : 'Play'}} {{song.title}}" ng-disabled="!song.available">
+      <span class="num" ng-if="!(cur() && player.playing)">{{index + 1}}</span>
+      <svg class="i fill hov"><use ng-attr-href="{{cur() && player.playing ? '#i-pause' : '#i-play'}}"/></svg>
+      <span class="eq" ng-if="cur() && player.playing" aria-label="Playing"><b></b><b></b><b></b></span>
+    </button>
+    <tt-cover item="song" class="xs"></tt-cover>
+    <div class="song-meta">
+      <div class="song-title-row">
+        <button class="title" ng-click="play()" ng-disabled="!song.available">{{song.title}}</button>
+        <span class="chip warn" ng-if="!song.available">Unavailable</span>
+      </div>
+      <span class="sub">{{song.artist}}</span>
+    </div>
+    <span class="album-col"><a ng-if="song.album" ng-href="#/albums/{{song.albumId}}" ng-click="$event.stopPropagation()">{{song.album}}</a><span ng-if="!song.album" class="dash-empty">—</span></span>
+    <span class="genre">{{song.genre}}</span>
+    <span class="plays" title="Total plays">{{lib.playsOf(song) | plays}}</span>
+    <button class="icon-btn like" ng-class="{on: lib.isLiked(song.id)}" ng-click="lib.toggleLike(song)" aria-pressed="{{lib.isLiked(song.id)}}" ng-attr-aria-label="{{lib.isLiked(song.id) ? 'Unlike' : 'Like'}} {{song.title}}"><svg class="i"><use href="#i-heart"/></svg></button>
+    <span class="dur">{{song.duration | duration}}</span>
+    <div class="menu-wrap" tt-click-outside="menu = false">
+      <button class="icon-btn" ng-click="toggleMenu($event)" aria-haspopup="true" aria-expanded="{{menu}}" ng-attr-aria-label="More options for {{song.title}}"><svg class="i fill"><use href="#i-more"/></svg></button>
+      <div class="menu" ng-class="{'flip-up': flipUp}" role="menu" ng-if="menu">
+        <button role="menuitem" ng-click="player.enqueue(song, true); close()" ng-disabled="!song.available"><svg class="i"><use href="#i-next"/></svg>Play next</button>
+        <button role="menuitem" ng-click="player.enqueue(song); close()" ng-disabled="!song.available"><svg class="i"><use href="#i-queue"/></svg>Add to queue</button>
+        <button role="menuitem" ng-click="lib.toggleLibrary(song); close()"><svg class="i"><use href="#i-library"/></svg>{{lib.inLibrary(song.id) ? 'Remove from library' : 'Add to library'}}</button>
+        <a role="menuitem" ng-href="#/albums/{{song.albumId}}" ng-click="close()"><svg class="i"><use href="#i-note"/></svg>Go to album</a>
+        <button role="menuitem" class="danger" ng-if="playlist" ng-click="lib.removeFromPlaylist(playlist, song); close()"><svg class="i"><use href="#i-trash"/></svg>Remove from this playlist</button>
+        <div class="menu-sep">Playlists</div>
+        <button role="menuitemcheckbox" ng-repeat="p in lib.state.playlists" ng-click="lib.togglePlaylistSong(p, song)" aria-checked="{{lib.inPlaylist(p, song.id)}}">
+          <svg class="i chk" ng-class="{off: !lib.inPlaylist(p, song.id)}"><use href="#i-check"/></svg>{{p.name}}
+        </button>
+        <p class="menu-note" ng-if="!lib.state.playlists.length">No playlists yet. <a href="#/playlists" ng-click="close()">Create one</a></p>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script type="text/ng-template" id="home.html">
+  <section class="page home-page">
+    <header class="page-head">
+      <h1>{{vm.greeting}}</h1>
+      <p class="lede">{{vm.lib.state.library.length | plural:'song'}} in your library, {{vm.lib.state.playlists.length | plural:'playlist'}} and {{vm.lib.state.albums.length | plural:'saved album'}}.</p>
+    </header>
+
+    <div class="notice" ng-if="!vm.session.user">You are browsing as a guest. Your library is saved on this device only. <a href="#/login">Log in</a> or <a href="#/register">create an account</a> to keep your own.</div>
+
+    <!-- Featured Hero (Driven by Trending Catalog Track) -->
+    <div class="home-hero" ng-if="vm.featured()">
+      <div class="home-hero-content">
+        <span class="hero-badge">Featured Track</span>
+        <h2>{{vm.featured().title}}</h2>
+        <p class="hero-sub">{{vm.featured().artist}} • {{vm.featured().album}} • {{vm.featured().genre}}</p>
+        <div class="hero-actions">
+          <button class="btn primary" ng-click="vm.play(vm.featured(), vm.trending())" aria-label="Play featured track {{vm.featured().title}}">
+            <svg class="i fill"><use href="#i-play"/></svg>Play Now
+          </button>
+          <button class="icon-btn like" ng-class="{on: vm.lib.isLiked(vm.featured().id)}" ng-click="vm.lib.toggleLike(vm.featured())" aria-label="Like featured track">
+            <svg class="i"><use href="#i-heart"/></svg>
+          </button>
+        </div>
+      </div>
+      <tt-cover item="vm.featured()" class="hero-art"></tt-cover>
+    </div>
+
+    <!-- Quick Access / Pick Up Where You Left Off -->
+    <section class="block" ng-if="vm.recent().length">
+      <div class="section-head">
+        <h2>Pick up where you left off</h2>
+      </div>
+      <div class="quick-grid">
+        <div class="quick-tile" ng-repeat="s in vm.recent()" ng-click="vm.play(s, vm.recent())" role="button" tabindex="0" ng-keypress="$event.which === 13 && vm.play(s, vm.recent())" ng-attr-aria-label="Play {{s.title}} by {{s.artist}}">
+          <tt-cover item="s" class="quick-art"></tt-cover>
+          <div class="quick-meta">
+            <strong>{{s.title}}</strong>
+            <span>{{s.artist}}</span>
+          </div>
+          <button class="quick-play" ng-click="$event.stopPropagation(); vm.play(s, vm.recent())" aria-label="Play {{s.title}}">
+            <svg class="i fill"><use href="#i-play"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trending Now -->
+    <section class="block">
+      <div class="section-head">
+        <h2>Trending now</h2>
+      </div>
+      <ng-include src="'chips.html'"></ng-include>
+      <div class="songs" ng-if="vm.trending().length">
+        <tt-song-row ng-repeat="s in vm.trending()" song="s" index="$index" list="vm.trending()"></tt-song-row>
+      </div>
+      <div class="empty" ng-if="!vm.trending().length">
+        <svg class="i empty-i"><use href="#i-note"/></svg>
+        <strong>No songs in {{vm.genre}} yet</strong>
+        <p>Try selecting another genre above or select All.</p>
+      </div>
+    </section>
+
+    <!-- Your Playlists -->
+    <section class="block">
+      <div class="section-head">
+        <h2>Your playlists</h2>
+        <a class="see-all" href="#/playlists">View all</a>
+      </div>
+      <div class="cards" ng-if="vm.lib.state.playlists.length">
+        <ng-include ng-repeat="p in vm.lib.state.playlists" src="'playlistcard.html'"></ng-include>
+      </div>
+      <div class="empty" ng-if="!vm.lib.state.playlists.length">
+        <svg class="i empty-i"><use href="#i-list"/></svg>
+        <strong>No playlists yet</strong>
+        <p>Group songs you love into a playlist. <a href="#/playlists">Create your first one</a>.</p>
+      </div>
+    </section>
+
+    <!-- Albums -->
+    <section class="block">
+      <div class="section-head">
+        <h2>Albums</h2>
+      </div>
+      <div class="cards" ng-if="vm.albums().length">
+        <ng-include ng-repeat="a in vm.albums()" src="'albumcard.html'"></ng-include>
+      </div>
+      <div class="empty" ng-if="!vm.albums().length">
+        <svg class="i empty-i"><use href="#i-note"/></svg>
+        <strong>No {{vm.genre}} albums yet</strong>
+      </div>
+    </section>
+  </section>
+</script>
+
+<script type="text/ng-template" id="search.html">
+  <section class="page search-page">
+    <header class="page-head">
+      <h1>Search</h1>
+      <p class="lede">Explore songs, artists, albums, and genres.</p>
+    </header>
+
+    <div class="searchbar">
+      <svg class="i search-i"><use href="#i-search"/></svg>
+      <input type="search" tt-focus ng-model="vm.q" ng-model-options="{debounce: 200}" ng-change="vm.sync()" placeholder="Search songs, artists, albums or genres" aria-label="Search songs, artists, albums or genres" autocomplete="off">
+      <button class="icon-btn search-clear" ng-if="vm.q" ng-click="vm.q = ''; vm.sync()" aria-label="Clear search"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+
+    <div class="search-filters">
+      <ng-include src="'chips.html'"></ng-include>
+      <label class="check"><input type="checkbox" ng-model="vm.onlyAvailable"> Hide unavailable songs</label>
+    </div>
+
+    <!-- Browse Genre Tiles (when no active query/filter) -->
+    <div class="browse-section" ng-if="!vm.active()">
+      <div class="section-head">
+        <h2>Browse by genre</h2>
+      </div>
+      <div class="tiles">
+        <button class="tile" ng-repeat="g in vm.genres" ng-click="vm.pick(g)" ng-attr-style="--h: {{vm.hue(g)}}" aria-label="Browse {{g}} genre with {{vm.count(g)}} songs">
+          <strong>{{g}}</strong><span>{{vm.count(g) | plural:'song'}}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Results Grouped -->
+    <div class="search-results" ng-if="vm.active()">
+      <div class="block" ng-if="vm.songs().length">
+        <div class="result-head">
+          <h2>Songs <small class="result-badge">{{vm.songs().length | plural:'result'}}</small></h2>
+          <button class="btn small primary" ng-click="vm.playAll()"><svg class="i fill"><use href="#i-play"/></svg>Play all</button>
+        </div>
+        <div class="songs">
+          <tt-song-row ng-repeat="s in vm.songs()" song="s" index="$index" list="vm.songs()"></tt-song-row>
+        </div>
+      </div>
+
+      <div class="block" ng-if="vm.albums().length">
+        <div class="section-head">
+          <h2>Albums <small class="result-badge">{{vm.albums().length | plural:'album'}}</small></h2>
+        </div>
+        <div class="cards">
+          <ng-include ng-repeat="a in vm.albums()" src="'albumcard.html'"></ng-include>
+        </div>
+      </div>
+
+      <!-- Empty / No Results -->
+      <div class="empty" ng-if="!vm.songs().length && !vm.albums().length">
+        <svg class="i empty-i"><use href="#i-search"/></svg>
+        <strong>Nothing matches "{{vm.q}}"<span ng-if="vm.genre"> in {{vm.genre}}</span></strong>
+        <p>Check the spelling, try another keyword or genre filter, or clear your search.</p>
+        <button class="btn small primary" ng-click="vm.reset()">Clear search</button>
+      </div>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="library.html">
+  <section class="page library-page">
+    <header class="page-head">
+      <h1>Your library</h1>
+      <p class="lede" ng-if="vm.tab !== 'albums'">{{vm.stats().count | plural:'song'}}, {{vm.stats().seconds | totalTime}}<span ng-if="vm.stats().playable < vm.stats().count"> ({{vm.stats().count - vm.stats().playable}} unavailable)</span></p>
+      <p class="lede" ng-if="vm.tab === 'albums'">{{vm.lib.state.albums.length | plural:'saved album'}}</p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Library sections">
+      <button role="tab" ng-class="{on: vm.tab === 'songs'}" aria-selected="{{vm.tab === 'songs'}}" ng-click="vm.setTab('songs')">
+        Songs <span class="tab-badge">{{vm.lib.state.library.length}}</span>
+      </button>
+      <button role="tab" ng-class="{on: vm.tab === 'liked'}" aria-selected="{{vm.tab === 'liked'}}" ng-click="vm.setTab('liked')">
+        Liked <span class="tab-badge">{{vm.lib.state.likes.length}}</span>
+      </button>
+      <button role="tab" ng-class="{on: vm.tab === 'albums'}" aria-selected="{{vm.tab === 'albums'}}" ng-click="vm.setTab('albums')">
+        Albums <span class="tab-badge">{{vm.lib.state.albums.length}}</span>
+      </button>
+    </div>
+
+    <div ng-if="vm.tab !== 'albums'">
+      <div class="toolbar" ng-if="vm.base().length">
+        <ng-include src="'chips.html'"></ng-include>
+        <div class="toolbar-right">
+          <label class="select-wrapper">
+            <span class="select-label">Sort by</span>
+            <select class="custom-select" ng-model="vm.sort" ng-options="o.id as o.label for o in vm.sorts" aria-label="Sort songs"></select>
+          </label>
+        </div>
+      </div>
+
+      <div class="actions" ng-if="vm.songs().length">
+        <button class="btn primary" ng-click="vm.playAll(false)"><svg class="i fill"><use href="#i-play"/></svg>Play all</button>
+        <button class="btn" ng-click="vm.playAll(true)"><svg class="i"><use href="#i-shuffle"/></svg>Shuffle</button>
+      </div>
+
+      <div class="songs" ng-if="vm.songs().length">
+        <tt-song-row ng-repeat="s in vm.songs()" song="s" index="$index" list="vm.songs()"></tt-song-row>
+      </div>
+
+      <!-- Empty States -->
+      <div class="empty" ng-if="!vm.base().length && vm.tab === 'songs'">
+        <svg class="i empty-i"><use href="#i-library"/></svg>
+        <strong>Your library is empty</strong>
+        <p>Open the menu on any song and choose "Add to library".</p>
+        <a class="btn primary small" href="#/search">Find songs</a>
+      </div>
+
+      <div class="empty" ng-if="!vm.base().length && vm.tab === 'liked'">
+        <svg class="i empty-i"><use href="#i-heart"/></svg>
+        <strong>No liked songs yet</strong>
+        <p>Tap the heart icon on any song to save it here.</p>
+        <a class="btn primary small" href="#/home">Browse trending</a>
+      </div>
+
+      <div class="empty" ng-if="vm.base().length && !vm.songs().length">
+        <svg class="i empty-i"><use href="#i-note"/></svg>
+        <strong>No {{vm.genre}} songs in this list</strong>
+        <p>Pick another genre filter above or select All.</p>
+      </div>
+    </div>
+
+    <div ng-if="vm.tab === 'albums'">
+      <div class="cards" ng-if="vm.lib.savedAlbums().length">
+        <ng-include ng-repeat="a in vm.lib.savedAlbums()" src="'albumcard.html'"></ng-include>
+      </div>
+      <div class="empty" ng-if="!vm.lib.savedAlbums().length">
+        <svg class="i empty-i"><use href="#i-note"/></svg>
+        <strong>No saved albums</strong>
+        <p>Open any album and choose "Save album" to keep it here.</p>
+        <a class="btn primary small" href="#/home">Browse albums</a>
+      </div>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="playlists.html">
+  <section class="page playlists-page">
+    <header class="page-head">
+      <h1>Playlists</h1>
+      <p class="lede">{{vm.lib.state.playlists.length | plural:'playlist'}} holding {{vm.totalSongs() | plural:'song'}}.</p>
+    </header>
+
+    <div class="panel create-pl-panel">
+      <h2>Create a playlist</h2>
+      <form name="f" class="inline-form" novalidate ng-submit="vm.create(f)">
+        <label class="sr" for="pl-name">Playlist name</label>
+        <input id="pl-name" name="name" ng-model="vm.name" ng-change="vm.error = ''" required maxlength="40" placeholder="Name your playlist (e.g. Chill Vibes, Workout)" autocomplete="off">
+        <button class="btn primary" type="submit"><svg class="i"><use href="#i-plus"/></svg>Create playlist</button>
+      </form>
+      <p class="field-error" role="alert" ng-if="vm.error">{{vm.error}}</p>
+    </div>
+
+    <div class="block" ng-if="vm.lib.state.playlists.length">
+      <div class="section-head">
+        <h2>Your collection</h2>
+      </div>
+      <div class="cards">
+        <ng-include ng-repeat="p in vm.lib.state.playlists" src="'playlistcard.html'"></ng-include>
+      </div>
+    </div>
+
+    <div class="empty block" ng-if="!vm.lib.state.playlists.length">
+      <svg class="i empty-i"><use href="#i-list"/></svg>
+      <strong>No playlists created yet</strong>
+      <p>Give your playlist a name above and start adding tracks from any song menu.</p>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="playlist.html">
+  <section class="page detail-page" ng-if="vm.pl">
+    <header class="detail-hero hero">
+      <div class="hero-cover-wrap">
+        <tt-cover item="vm.pl" class="lg"></tt-cover>
+      </div>
+      <div class="hero-text">
+        <span class="kind-badge">PLAYLIST</span>
+        <h1 ng-if="!vm.editing" class="detail-title">{{vm.pl.name}}</h1>
+        
+        <!-- Inline Rename Form -->
+        <form name="rf" ng-if="vm.editing" class="inline-form edit-form" novalidate ng-submit="vm.save()">
+          <input name="n" tt-focus ng-model="vm.draft" ng-change="vm.error = ''" required maxlength="40" aria-label="Playlist name">
+          <button class="btn primary" type="submit">Save name</button>
+          <button class="btn" type="button" ng-click="vm.editing = false">Cancel</button>
+        </form>
+        <p class="field-error" role="alert" ng-if="vm.error">{{vm.error}}</p>
+
+        <p class="detail-meta-line" ng-if="!vm.editing">
+          <span>Created by You</span> • 
+          <span>{{vm.stats().count | plural:'song'}}</span> • 
+          <span>{{vm.stats().seconds | totalTime}}</span>
+        </p>
+
+        <dl class="stats stats-pills">
+          <div><dt>Tracks</dt><dd>{{vm.stats().count}}</dd></div>
+          <div><dt>Playable</dt><dd>{{vm.stats().playable}}</dd></div>
+          <div><dt>Liked</dt><dd>{{vm.stats().liked}}</dd></div>
+          <div ng-if="vm.stats().top"><dt>Top genre</dt><dd>{{vm.stats().top}}</dd></div>
+        </dl>
+
+        <div class="actions hero-actions">
+          <button class="btn primary" ng-click="vm.playAll(false)" ng-disabled="!vm.stats().count"><svg class="i fill"><use href="#i-play"/></svg>Play</button>
+          <button class="btn" ng-click="vm.playAll(true)" ng-disabled="!vm.stats().count"><svg class="i"><use href="#i-shuffle"/></svg>Shuffle</button>
+          <button class="btn" ng-click="vm.edit()" ng-if="!vm.editing"><svg class="i"><use href="#i-edit"/></svg>Rename</button>
+          <button class="btn danger" ng-click="vm.remove()"><svg class="i"><use href="#i-trash"/></svg>{{vm.confirming ? 'Confirm delete' : 'Delete'}}</button>
+          <button class="btn" ng-if="vm.confirming" ng-click="vm.confirming = false">Cancel</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Playlist Tracklist -->
+    <div class="songs" ng-if="vm.songs().length">
+      <tt-song-row ng-repeat="s in vm.songs()" song="s" index="$index" playlist="vm.pl" list="vm.songs()"></tt-song-row>
+    </div>
+
+    <div class="empty" ng-if="!vm.songs().length">
+      <svg class="i empty-i"><use href="#i-list"/></svg>
+      <strong>This playlist is empty</strong>
+      <p>Add recommended tracks below, or use the menu on any song to add it here.</p>
+    </div>
+
+    <!-- Suggested Additions -->
+    <section class="block suggestions-section" ng-if="vm.suggestions().length">
+      <div class="section-head">
+        <h2>Recommended songs</h2>
+        <span class="sub-head-note">Based on trending songs</span>
+      </div>
+      <ul class="suggest">
+        <li ng-repeat="s in vm.suggestions()">
+          <tt-cover item="s" class="xs"></tt-cover>
+          <span><strong>{{s.title}}</strong><em>{{s.artist}} • {{s.genre}}</em></span>
+          <button class="btn small" ng-click="vm.lib.togglePlaylistSong(vm.pl, s)" aria-label="Add {{s.title}} to playlist"><svg class="i"><use href="#i-plus"/></svg>Add</button>
+        </li>
+      </ul>
+    </section>
+  </section>
+
+  <section class="page" ng-if="!vm.pl">
+    <div class="empty">
+      <strong>Playlist not found</strong>
+      <p>It may have been deleted. <a href="#/playlists">Back to playlists</a>.</p>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="album.html">
+  <section class="page detail-page" ng-if="vm.album">
+    <header class="detail-hero hero">
+      <div class="hero-cover-wrap">
+        <tt-cover item="vm.album" class="lg"></tt-cover>
+      </div>
+      <div class="hero-text">
+        <span class="kind-badge">ALBUM</span>
+        <h1 class="detail-title">{{vm.album.title}}</h1>
+        <p class="detail-meta-line">
+          <strong>{{vm.album.artist}}</strong> • 
+          <span>{{vm.album.year}}</span> • 
+          <span>{{vm.album.genre}}</span> • 
+          <span>{{vm.stats().count | plural:'track'}}</span>, <span>{{vm.stats().seconds | totalTime}}</span>
+        </p>
+
+        <dl class="stats stats-pills">
+          <div><dt>Tracks</dt><dd>{{vm.stats().count}}</dd></div>
+          <div><dt>Playable</dt><dd>{{vm.stats().playable}}</dd></div>
+          <div><dt>Liked</dt><dd>{{vm.stats().liked}}</dd></div>
+        </dl>
+
+        <div class="actions hero-actions">
+          <button class="btn primary" ng-click="vm.playAll(false)"><svg class="i fill"><use href="#i-play"/></svg>Play</button>
+          <button class="btn" ng-click="vm.playAll(true)"><svg class="i"><use href="#i-shuffle"/></svg>Shuffle</button>
+          <button class="btn" ng-class="{active: vm.lib.albumSaved(vm.album.id)}" ng-click="vm.lib.toggleAlbum(vm.album)">
+            <svg class="i"><use ng-attr-href="{{vm.lib.albumSaved(vm.album.id) ? '#i-check' : '#i-plus'}}"/></svg>{{vm.lib.albumSaved(vm.album.id) ? 'Saved to Library' : 'Save Album'}}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="songs">
+      <tt-song-row ng-repeat="s in vm.songs" song="s" index="$index" list="vm.songs"></tt-song-row>
+    </div>
+  </section>
+
+  <section class="page" ng-if="!vm.album">
+    <div class="empty">
+      <strong>Album not found</strong>
+      <p><a href="#/home">Back to home</a></p>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="profile.html">
+  <section class="page narrow profile-page">
+    <header class="page-head profile-hero">
+      <div class="avatar big" aria-hidden="true">{{vm.user.name | initials}}</div>
+      <div class="profile-hero-info">
+        <span class="kind-badge">ACCOUNT</span>
+        <h1>{{vm.user.name}}</h1>
+        <p class="lede">{{vm.user.email}} • Member since {{vm.user.joined | date:'MMMM y'}}</p>
+      </div>
+    </header>
+
+    <dl class="stats wide" aria-label="Listening statistics">
+      <div><dt>Liked songs</dt><dd>{{vm.stats().likes}}</dd></div>
+      <div><dt>Library songs</dt><dd>{{vm.stats().library}}</dd></div>
+      <div><dt>Saved albums</dt><dd>{{vm.stats().albums}}</dd></div>
+      <div><dt>Playlists</dt><dd>{{vm.stats().playlists}}</dd></div>
+      <div><dt>Listening time</dt><dd>{{vm.stats().listened | totalTime}}</dd></div>
+      <div><dt>Top genre</dt><dd>{{vm.stats().top || 'None yet'}}</dd></div>
+    </dl>
+
+    <form name="f" novalidate ng-submit="vm.save(f)" class="panel form-panel">
+      <h2>Display name</h2>
+      <div class="field">
+        <label for="pname">Name</label>
+        <input id="pname" name="name" ng-model="vm.name" required minlength="2" maxlength="30" autocomplete="name" aria-describedby="pname-err" ng-disabled="vm.busy">
+        <p id="pname-err" class="field-error" role="alert" ng-if="f.name.$touched && f.name.$error.required">Enter a name.</p>
+        <p id="pname-err" class="field-error" role="alert" ng-if="f.name.$touched && f.name.$error.minlength">Use at least 2 characters.</p>
+      </div>
+      <button class="btn primary" type="submit" ng-disabled="vm.busy || f.$pristine">{{vm.busy ? 'Saving...' : 'Save changes'}}</button>
+    </form>
+
+    <section class="block">
+      <div class="section-head">
+        <h2>Recently played</h2>
+      </div>
+      <div class="songs" ng-if="vm.recent().length">
+        <tt-song-row ng-repeat="s in vm.recent()" song="s" index="$index" list="vm.recent()"></tt-song-row>
+      </div>
+      <div class="empty" ng-if="!vm.recent().length">
+        <svg class="i empty-i"><use href="#i-note"/></svg>
+        <strong>No listening history</strong>
+        <p>Play a song and it will be listed here.</p>
+      </div>
+    </section>
+
+    <section class="panel danger-panel">
+      <h2>Account management</h2>
+      <div class="actions">
+        <button class="btn" ng-click="app.logout()"><svg class="i"><use href="#i-user"/></svg>Log out</button>
+        <button class="btn danger" ng-click="vm.reset()"><svg class="i"><use href="#i-trash"/></svg>{{vm.confirmReset ? 'Confirm reset' : 'Reset library data'}}</button>
+        <button class="btn" ng-if="vm.confirmReset" ng-click="vm.confirmReset = false">Cancel</button>
+      </div>
+      <p class="hint">Resetting clears likes, library, playlists, and history for this account.</p>
+    </section>
+  </section>
+</script>
+
+<script type="text/ng-template" id="login.html">
+  <section class="page auth">
+    <div class="auth-wrap">
+      <a class="brand auth-brand" href="#/home" aria-label="TopTunes Home">
+        <svg class="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M10 21V11l13-2v10M10 17l13-2"/></svg>
+        <span>TopTunes</span>
+      </a>
+
+      <div class="auth-card">
+        <header class="auth-head">
+          <h1>Welcome back</h1>
+          <p class="lede">Pick up your library where you left off.</p>
+        </header>
+
+        <div class="alert error" role="alert" ng-if="vm.error">{{vm.error}}</div>
+
+        <form name="f" novalidate ng-submit="vm.submit(f)">
+          <div class="field">
+            <label for="l-email">Email address</label>
+            <input id="l-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required autocomplete="email" aria-describedby="l-email-err" ng-disabled="vm.busy">
+            <p id="l-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.required">Enter your email address.</p>
+            <p id="l-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.email">That does not look like a valid email address.</p>
+          </div>
+
+          <div class="field">
+            <label for="l-pass">Password</label>
+            <div class="input-pass-wrap">
+              <input id="l-pass" type="{{showPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required autocomplete="current-password" aria-describedby="l-pass-err" ng-disabled="vm.busy">
+              <button type="button" class="pass-toggle-btn" ng-click="showPass = !showPass" aria-label="{{showPass ? 'Hide password' : 'Show password'}}">
+                <span ng-if="!showPass">Show</span>
+                <span ng-if="showPass">Hide</span>
+              </button>
+            </div>
+            <p id="l-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.required">Enter your password.</p>
+          </div>
+
+          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy">
+            {{vm.busy ? 'Signing in...' : 'Sign in'}}
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          <p class="hint">No account yet? <a href="#/register">Create one</a>.</p>
+          <p class="hint demo-hint">Just exploring? <button class="linkish" type="button" ng-click="vm.demo()">Fill demo account</button></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="register.html">
+  <section class="page auth">
+    <div class="auth-wrap">
+      <a class="brand auth-brand" href="#/home" aria-label="TopTunes Home">
+        <svg class="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M10 21V11l13-2v10M10 17l13-2"/></svg>
+        <span>TopTunes</span>
+      </a>
+
+      <div class="auth-card">
+        <header class="auth-head">
+          <h1>Create an account</h1>
+          <p class="lede">Save likes, library, and playlists under your name.</p>
+        </header>
+
+        <div class="alert error" role="alert" ng-if="vm.error">{{vm.error}}</div>
+
+        <form name="f" novalidate ng-submit="vm.submit(f)">
+          <div class="field">
+            <label for="r-name">Full name</label>
+            <input id="r-name" name="name" ng-model="vm.user.name" required minlength="2" maxlength="30" autocomplete="name" aria-describedby="r-name-err" ng-disabled="vm.busy">
+            <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.required">Enter your name.</p>
+            <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.minlength">Use at least 2 characters.</p>
+          </div>
+
+          <div class="field">
+            <label for="r-email">Email address</label>
+            <input id="r-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required autocomplete="email" aria-describedby="r-email-err" ng-disabled="vm.busy">
+            <p id="r-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.required">Enter your email address.</p>
+            <p id="r-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.email">That does not look like a valid email address.</p>
+          </div>
+
+          <div class="field">
+            <label for="r-pass">Password</label>
+            <div class="input-pass-wrap">
+              <input id="r-pass" type="{{showRegPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required minlength="8" ng-pattern="vm.passwordRule" autocomplete="new-password" aria-describedby="r-pass-err" ng-disabled="vm.busy">
+              <button type="button" class="pass-toggle-btn" ng-click="showRegPass = !showRegPass" aria-label="{{showRegPass ? 'Hide password' : 'Show password'}}">
+                <span ng-if="!showRegPass">Show</span>
+                <span ng-if="showRegPass">Hide</span>
+              </button>
+            </div>
+            <div class="meter" ng-class="'s' + vm.strength()" ng-if="vm.user.password" aria-live="polite">
+              <i></i><i></i><i></i><i></i>
+              <span class="meter-label">{{vm.strengthLabel()}}</span>
+            </div>
+            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.required">Choose a password.</p>
+            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.minlength">Use at least 8 characters.</p>
+            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.pattern && !f.password.$error.minlength">Include at least one letter and one number.</p>
+          </div>
+
+          <div class="field">
+            <label for="r-confirm">Confirm password</label>
+            <div class="input-pass-wrap">
+              <input id="r-confirm" type="{{showRegPass ? 'text' : 'password'}}" name="confirm" ng-model="vm.user.confirm" required tt-match="vm.user.password" autocomplete="new-password" aria-describedby="r-confirm-err" ng-disabled="vm.busy">
+            </div>
+            <p id="r-confirm-err" class="field-error" role="alert" ng-if="(f.confirm.$touched || f.$submitted) && f.confirm.$error.required">Repeat your password.</p>
+            <p id="r-confirm-err" class="field-error" role="alert" ng-if="(f.confirm.$touched || f.$submitted) && f.confirm.$error.match && !f.confirm.$error.required">The passwords do not match.</p>
+          </div>
+
+          <div class="field terms-field">
+            <label class="check"><input type="checkbox" name="terms" ng-model="vm.user.terms" required aria-describedby="terms-err"> I accept the TopTunes terms of use</label>
+            <p id="terms-err" class="field-error" role="alert" ng-if="f.$submitted && f.terms.$error.required">Accept the terms to continue.</p>
+          </div>
+
+          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy">
+            {{vm.busy ? 'Creating account...' : 'Create account'}}
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          <p class="hint">Already registered? <a href="#/login">Log in</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</script>
+
+<script src="vendor/angular.min.js"></script>
+<script src="vendor/angular-route.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
