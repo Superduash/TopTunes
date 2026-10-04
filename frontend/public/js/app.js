@@ -1243,6 +1243,8 @@
       }).catch(function (e) { vm.error = e.message || 'Could not create your account. Try again.'; })
         ['finally'](function () { vm.busy = false; });
     };
+  }]);
+
   app.controller('AdminCtrl', ['$scope', 'Catalog', 'Api', 'Toast', function ($scope, Catalog, Api, Toast) {
     var vm = this;
     vm.catalog = Catalog;
