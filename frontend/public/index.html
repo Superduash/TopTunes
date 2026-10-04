@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title ng-bind="title">TopTunes</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
-  <link rel="icon" href="favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
   <meta name="theme-color" content="#ffb224">
@@ -18,6 +18,10 @@
 
 <!-- Icon sprite -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="8" fill="#ffb224"/>
+    <path d="M9 22V10m5 12V6m5 16V13m5 9V9" stroke="#0f1220" stroke-width="3" stroke-linecap="round" fill="none"/>
+  </symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 5l10 7-10 7zM18 5v14"/></symbol>
@@ -48,7 +52,7 @@
 <div class="loadbar" ng-class="{on: app.loading}" role="progressbar" aria-label="Loading content" ng-attr-aria-valuenow="{{app.loading ? 100 : 0}}"></div>
 
 <header class="topbar">
-  <a class="brand" href="#/home"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 22V10m5 12V6m5 16V13m5 9V9"/></svg>TopTunes</a>
+  <a class="brand" href="#/home"><svg class="mark" aria-hidden="true"><use href="#i-logo"/></svg>TopTunes</a>
   <a class="btn small" href="#/login" ng-if="!app.session.user">Log in</a>
   <a class="avatar" href="#/profile" ng-if="app.session.user" aria-label="Your profile">{{app.session.user.name | initials}}</a>
 </header>
@@ -56,7 +60,7 @@
 <div class="shell">
   <aside class="side" role="navigation" aria-label="Sidebar navigation">
     <a class="brand" href="#/home" aria-label="TopTunes Home">
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 22V10m5 12V6m5 16V13m5 9V9"/></svg>
+      <svg class="mark" aria-hidden="true"><use href="#i-logo"/></svg>
       <span>TopTunes</span>
     </a>
 
@@ -741,7 +745,7 @@
   <section class="page auth">
     <div class="auth-wrap">
       <a class="brand auth-brand" href="#/home" aria-label="TopTunes Home">
-        <svg class="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M10 21V11l13-2v10M10 17l13-2"/></svg>
+        <svg class="mark" aria-hidden="true"><use href="#i-logo"/></svg>
         <span>TopTunes</span>
       </a>
 
@@ -756,15 +760,15 @@
         <form name="f" novalidate ng-submit="vm.submit(f)">
           <div class="field">
             <label for="l-email">Email address</label>
-            <input id="l-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required autocomplete="email" aria-describedby="l-email-err" ng-disabled="vm.busy">
+            <input id="l-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required ng-pattern="vm.emailRule" autocomplete="email" aria-describedby="l-email-err" ng-disabled="vm.busy" placeholder="you@example.com">
             <p id="l-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.required">Enter your email address.</p>
-            <p id="l-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.email">That does not look like a valid email address.</p>
+            <p id="l-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && (f.email.$error.email || f.email.$error.pattern) && !f.email.$error.required">Enter a valid email address.</p>
           </div>
 
           <div class="field">
             <label for="l-pass">Password</label>
             <div class="input-pass-wrap">
-              <input id="l-pass" type="{{showPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required autocomplete="current-password" aria-describedby="l-pass-err" ng-disabled="vm.busy">
+              <input id="l-pass" type="{{showPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required autocomplete="current-password" aria-describedby="l-pass-err" ng-disabled="vm.busy" placeholder="Enter password">
               <button type="button" class="pass-toggle-btn" ng-click="showPass = !showPass" aria-label="{{showPass ? 'Hide password' : 'Show password'}}">
                 <span ng-if="!showPass">Show</span>
                 <span ng-if="showPass">Hide</span>
@@ -773,7 +777,7 @@
             <p id="l-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.required">Enter your password.</p>
           </div>
 
-          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy">
+          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy || f.$invalid">
             {{vm.busy ? 'Signing in...' : 'Sign in'}}
           </button>
         </form>
@@ -791,7 +795,7 @@
   <section class="page auth">
     <div class="auth-wrap">
       <a class="brand auth-brand" href="#/home" aria-label="TopTunes Home">
-        <svg class="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M10 21V11l13-2v10M10 17l13-2"/></svg>
+        <svg class="mark" aria-hidden="true"><use href="#i-logo"/></svg>
         <span>TopTunes</span>
       </a>
 
@@ -806,22 +810,23 @@
         <form name="f" novalidate ng-submit="vm.submit(f)">
           <div class="field">
             <label for="r-name">Full name</label>
-            <input id="r-name" name="name" ng-model="vm.user.name" required minlength="2" maxlength="30" autocomplete="name" aria-describedby="r-name-err" ng-disabled="vm.busy">
+            <input id="r-name" name="name" ng-model="vm.user.name" required minlength="2" maxlength="50" ng-pattern="vm.nameRule" autocomplete="name" aria-describedby="r-name-err" ng-disabled="vm.busy" placeholder="e.g. Alex Morgan">
             <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.required">Enter your name.</p>
-            <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.minlength">Use at least 2 characters.</p>
+            <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.minlength && !f.name.$error.required">Use at least 2 characters.</p>
+            <p id="r-name-err" class="field-error" role="alert" ng-if="(f.name.$touched || f.$submitted) && f.name.$error.pattern && !f.name.$error.required && !f.name.$error.minlength">Enter a valid name.</p>
           </div>
 
           <div class="field">
             <label for="r-email">Email address</label>
-            <input id="r-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required autocomplete="email" aria-describedby="r-email-err" ng-disabled="vm.busy">
+            <input id="r-email" type="email" inputmode="email" name="email" ng-model="vm.user.email" required ng-pattern="vm.emailRule" autocomplete="email" aria-describedby="r-email-err" ng-disabled="vm.busy" placeholder="you@example.com">
             <p id="r-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.required">Enter your email address.</p>
-            <p id="r-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && f.email.$error.email">That does not look like a valid email address.</p>
+            <p id="r-email-err" class="field-error" role="alert" ng-if="(f.email.$touched || f.$submitted) && (f.email.$error.email || f.email.$error.pattern) && !f.email.$error.required">Enter a valid email address.</p>
           </div>
 
           <div class="field">
             <label for="r-pass">Password</label>
             <div class="input-pass-wrap">
-              <input id="r-pass" type="{{showRegPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required minlength="8" ng-pattern="vm.passwordRule" autocomplete="new-password" aria-describedby="r-pass-err" ng-disabled="vm.busy">
+              <input id="r-pass" type="{{showRegPass ? 'text' : 'password'}}" name="password" ng-model="vm.user.password" required minlength="8" ng-pattern="vm.passwordRule" autocomplete="new-password" aria-describedby="r-pass-err" ng-disabled="vm.busy" placeholder="At least 8 characters">
               <button type="button" class="pass-toggle-btn" ng-click="showRegPass = !showRegPass" aria-label="{{showRegPass ? 'Hide password' : 'Show password'}}">
                 <span ng-if="!showRegPass">Show</span>
                 <span ng-if="showRegPass">Hide</span>
@@ -832,31 +837,65 @@
               <span class="meter-label">{{vm.strengthLabel()}}</span>
             </div>
             <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.required">Choose a password.</p>
-            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.minlength">Use at least 8 characters.</p>
-            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.pattern && !f.password.$error.minlength">Include at least one letter and one number.</p>
+            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.minlength && !f.password.$error.required">Use at least 8 characters.</p>
+            <p id="r-pass-err" class="field-error" role="alert" ng-if="(f.password.$touched || f.$submitted) && f.password.$error.pattern && !f.password.$error.minlength && !f.password.$error.required">Include at least one letter and one number.</p>
           </div>
 
           <div class="field">
             <label for="r-confirm">Confirm password</label>
             <div class="input-pass-wrap">
-              <input id="r-confirm" type="{{showRegPass ? 'text' : 'password'}}" name="confirm" ng-model="vm.user.confirm" required tt-match="vm.user.password" autocomplete="new-password" aria-describedby="r-confirm-err" ng-disabled="vm.busy">
+              <input id="r-confirm" type="{{showRegPass ? 'text' : 'password'}}" name="confirm" ng-model="vm.user.confirm" required tt-match="vm.user.password" autocomplete="new-password" aria-describedby="r-confirm-err" ng-disabled="vm.busy" placeholder="Re-enter password">
             </div>
             <p id="r-confirm-err" class="field-error" role="alert" ng-if="(f.confirm.$touched || f.$submitted) && f.confirm.$error.required">Repeat your password.</p>
             <p id="r-confirm-err" class="field-error" role="alert" ng-if="(f.confirm.$touched || f.$submitted) && f.confirm.$error.match && !f.confirm.$error.required">The passwords do not match.</p>
           </div>
 
           <div class="field terms-field">
-            <label class="check"><input type="checkbox" name="terms" ng-model="vm.user.terms" required aria-describedby="terms-err"> I accept the TopTunes terms of use</label>
-            <p id="terms-err" class="field-error" role="alert" ng-if="f.$submitted && f.terms.$error.required">Accept the terms to continue.</p>
+            <label class="check">
+              <input type="checkbox" name="terms" ng-model="vm.user.terms" required aria-describedby="terms-err" ng-disabled="vm.busy">
+              <span>I accept the TopTunes <a href="" class="terms-link" ng-click="vm.openTerms($event)">terms of use</a></span>
+            </label>
+            <p id="terms-err" class="field-error" role="alert" ng-if="(f.terms.$touched || f.$submitted) && f.terms.$error.required">Accept the terms of use to continue.</p>
           </div>
 
-          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy">
+          <button class="btn primary wide auth-submit" type="submit" ng-disabled="vm.busy || f.$invalid">
             {{vm.busy ? 'Creating account...' : 'Create account'}}
           </button>
         </form>
 
         <div class="auth-footer">
           <p class="hint">Already registered? <a href="#/login">Log in</a>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terms of Use Modal -->
+    <div class="modal-backdrop" ng-if="vm.showTerms" ng-click="vm.closeTerms()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.78); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; backdrop-filter: blur(4px);">
+      <div class="card terms-modal" ng-click="$event.stopPropagation()" style="background: var(--surface-1); border-radius: var(--r-xl); padding: 28px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: var(--shadow-3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px;">
+          <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--text); margin: 0;">TopTunes Terms of Use</h2>
+          <button class="icon-btn" ng-click="vm.closeTerms()" aria-label="Close terms modal"><svg class="i"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="terms-content" style="color: var(--text-2); font-size: 0.92rem; line-height: 1.6; display: grid; gap: 14px;">
+          <div>
+            <strong style="color: var(--text); display: block; font-size: 0.95rem; margin-bottom: 4px;">1. Service Overview</strong>
+            <p>TopTunes is a music streaming web platform designed for personal listening, catalog discovery, and playlist curation.</p>
+          </div>
+          <div>
+            <strong style="color: var(--text); display: block; font-size: 0.95rem; margin-bottom: 4px;">2. User Accounts & Security</strong>
+            <p>You agree to provide accurate registration details and maintain the security of your account credentials. You are responsible for all activities that occur under your account.</p>
+          </div>
+          <div>
+            <strong style="color: var(--text); display: block; font-size: 0.95rem; margin-bottom: 4px;">3. Playlists & Library Content</strong>
+            <p>Your liked tracks, listening history, and custom playlists are saved to your personal profile. Do not upload copyright-infringing audio files or offensive content.</p>
+          </div>
+          <div>
+            <strong style="color: var(--text); display: block; font-size: 0.95rem; margin-bottom: 4px;">4. Privacy & Data Storage</strong>
+            <p>Your session and preferences are stored securely. We do not sell your personal data or track you across third-party websites.</p>
+          </div>
+        </div>
+        <div style="margin-top: 24px; text-align: right; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+          <button class="btn primary small" type="button" ng-click="vm.closeTerms()">I Understand</button>
         </div>
       </div>
     </div>

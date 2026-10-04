@@ -986,7 +986,11 @@
     return {
       require: 'ngModel',
       link: function (scope, el, attrs, ctrl) {
-        ctrl.$validators.match = function (v) { return v === scope.$eval(attrs.ttMatch); };
+        ctrl.$validators.match = function (v) {
+          var target = scope.$eval(attrs.ttMatch);
+          if (v === undefined || v === null || v === '') return true;
+          return v === target;
+        };
         scope.$watch(attrs.ttMatch, function () { ctrl.$validate(); });
       }
     };
@@ -1209,11 +1213,23 @@
 
   app.controller('LoginCtrl', ['$location', 'Session', 'Toast', function ($loc, S, Toast) {
     var vm = this;
-    vm.user = { email: '', password: '' }; vm.busy = false; vm.error = '';
+    vm.user = { email: '', password: '' };
+    vm.busy = false;
+    vm.error = '';
+    vm.emailRule = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.(com|net|org|edu|gov|mil|biz|info|io|ai|co|me|dev|app|xyz|tech|site|online|top|music|audio|media|live|cloud|tv|in|us|uk|ca|de|fr|jp|au|it|es|nl|eu|ch|se|no|fi|ru|br|za|kr|mx|nz|sg|is|agency|store|space|digital|global)$/i;
     vm.demo = function () { vm.user.email = 'demo@toptunes.dev'; vm.user.password = 'demo1234'; vm.error = ''; };
     vm.submit = function (form) {
       vm.error = '';
-      if (form.$invalid) { return; }
+      if (!form || form.$invalid) {
+        if (form) {
+          angular.forEach(form, function (field) {
+            if (field && typeof field.$setTouched === 'function') {
+              field.$setTouched();
+            }
+          });
+        }
+        return;
+      }
       vm.busy = true;
       S.login(vm.user).then(function (u) {
         Toast.success('Welcome back, ' + (u.name ? u.name.split(' ')[0] : 'Listener') + '.');
@@ -1225,23 +1241,63 @@
 
   app.controller('RegisterCtrl', ['$location', 'Session', 'Toast', function ($loc, S, Toast) {
     var vm = this;
-    vm.user = { name: '', email: '', password: '', confirm: '', terms: false }; vm.busy = false; vm.error = '';
+    vm.user = { name: '', email: '', password: '', confirm: '', terms: false };
+    vm.busy = false;
+    vm.error = '';
+    vm.showTerms = false;
+
+    // Full name: 2-50 characters, reject numbers-only/symbol-only input, allow normal spaces and common name characters such as apostrophe/hyphen
+    vm.nameRule = /^(?=.*[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF])[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF\s'’.\-]+$/;
+
+    // Email: Genuine email format rejecting malformed domains such as gmail.comd, missing @, spaces, etc.
+    vm.emailRule = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.(com|net|org|edu|gov|mil|biz|info|io|ai|co|me|dev|app|xyz|tech|site|online|top|music|audio|media|live|cloud|tv|in|us|uk|ca|de|fr|jp|au|it|es|nl|eu|ch|se|no|fi|ru|br|za|kr|mx|nz|sg|is|agency|store|space|digital|global)$/i;
+
+    // Password: minimum 8 characters, at least one letter and one number
     vm.passwordRule = /^(?=.*[A-Za-z])(?=.*\d).+$/;
+
     vm.strength = function () {
       var p = vm.user.password || '', s = 0;
-      if (p.length >= 8) { s++; } if (/[a-z]/.test(p) && /[A-Z]/.test(p)) { s++; } if (/\d/.test(p)) { s++; } if (/[^A-Za-z0-9]/.test(p)) { s++; }
+      if (p.length >= 8) { s++; }
+      if (/[a-z]/.test(p) && /[A-Z]/.test(p)) { s++; }
+      if (/\d/.test(p)) { s++; }
+      if (/[^A-Za-z0-9]/.test(p)) { s++; }
       return p ? s : 0;
     };
-    vm.strengthLabel = function () { return ['', 'Weak', 'Fair', 'Good', 'Strong'][vm.strength()]; };
+
+    vm.strengthLabel = function () {
+      return ['', 'Weak', 'Fair', 'Good', 'Strong'][vm.strength()];
+    };
+
+    vm.openTerms = function ($event) {
+      if ($event) { $event.preventDefault(); }
+      vm.showTerms = true;
+    };
+
+    vm.closeTerms = function () {
+      vm.showTerms = false;
+    };
+
     vm.submit = function (form) {
       vm.error = '';
-      if (form.$invalid) { return; }
+      if (!form || form.$invalid) {
+        if (form) {
+          angular.forEach(form, function (field) {
+            if (field && typeof field.$setTouched === 'function') {
+              field.$setTouched();
+            }
+          });
+        }
+        return;
+      }
       vm.busy = true;
       S.register(vm.user).then(function (u) {
         Toast.success('Account created. Welcome to TopTunes, ' + (u.name ? u.name.split(' ')[0] : 'Listener') + '!');
         $loc.url('/home');
-      }).catch(function (e) { vm.error = e.message || 'Could not create your account. Try again.'; })
-        ['finally'](function () { vm.busy = false; });
+      }).catch(function (e) {
+        vm.error = e.message || 'Could not create your account. Try again.';
+      })['finally'](function () {
+        vm.busy = false;
+      });
     };
   }]);
 

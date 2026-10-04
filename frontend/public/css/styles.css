@@ -2009,15 +2009,42 @@ tt-song-row:nth-last-child(-n+3) .menu,
   background: var(--surface-hover);
 }
 
-input.ng-invalid.ng-touched, form.ng-submitted input.ng-invalid:not([type=checkbox]) {
-  border-color: var(--danger);
+input.ng-invalid.ng-touched:not([type=checkbox]):not([type=range]),
+form.ng-submitted input.ng-invalid:not([type=checkbox]):not([type=range]) {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18) !important;
+}
+
+input.ng-valid.ng-touched.ng-dirty:not([type=checkbox]):not([type=range]) {
+  border-color: rgba(52, 211, 153, 0.5);
 }
 
 .field-error {
   color: var(--danger);
   font-size: 0.84rem;
-  margin-top: 3px;
+  margin-top: 4px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: fieldErrFade 0.18s ease-in-out;
+}
+
+@keyframes fieldErrFade {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.terms-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.terms-link:hover {
+  color: var(--accent-hover);
 }
 
 .alert {
