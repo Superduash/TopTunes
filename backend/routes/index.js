@@ -9,6 +9,7 @@ const libraryRoutes = require('./library.routes');
 const playlistsRoutes = require('./playlists.routes');
 const queueRoutes = require('./queue.routes');
 const searchRoutes = require('./search.routes');
+const adminRoutes = require('./admin.routes');
 
 // GET /api/health
 router.get('/health', (req, res) => {
@@ -27,6 +28,7 @@ router.use('/users', usersRoutes);
 router.use('/library', libraryRoutes);
 router.use('/playlists', playlistsRoutes);
 router.use('/queue', queueRoutes);
+router.use('/admin', adminRoutes);
 router.use('/', searchRoutes);
 router.use('/', catalogRoutes);
 

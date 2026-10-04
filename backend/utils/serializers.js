@@ -26,6 +26,8 @@ function serializeSong(song, options = {}) {
     likeCount: doc.likeCount || 0,
     hue: doc.hue !== undefined ? doc.hue : 0,
     shape: doc.shape !== undefined ? doc.shape : 0,
+    audioUrl: doc.audioUrl || null,
+    coverUrl: doc.coverUrl || null,
     liked: liked
   };
 }
@@ -154,6 +156,7 @@ function serializeUser(user) {
     id: doc.id || doc._id?.toString(),
     name: doc.name || '',
     email: doc.email || '',
+    role: doc.role || 'user',
     avatarColor: doc.avatarColor || '#ffb224',
     avatarSeed: doc.avatarSeed || '',
     listeningSeconds: doc.listeningSeconds || 0,

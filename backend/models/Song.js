@@ -49,6 +49,16 @@ const songSchema = new mongoose.Schema({
   shape: {
     type: Number,
     default: 0
+  },
+  audioUrl: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  coverUrl: {
+    type: String,
+    trim: true,
+    default: null
   }
 }, {
   timestamps: true,

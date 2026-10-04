@@ -9,11 +9,11 @@ async function startServer() {
     // 1. Connect to MongoDB
     await connectDB();
 
-    // 1.1 Auto-seed database if empty (ensures in-memory dev DB always has catalog & demo user)
-    const { Song } = require('./backend/models');
-    const count = await Song.countDocuments();
+    // 1.1 Auto-seed database if user accounts are missing (ensures admin & demo users exist)
+    const { User } = require('./backend/models');
+    const count = await User.countDocuments();
     if (count === 0) {
-      console.log('[Database] Catalog is empty. Auto-seeding initial dataset...');
+      console.log('[Database] Admin/User accounts missing. Auto-seeding initial dataset...');
       const seedDatabase = require('./backend/seed/seed');
       await seedDatabase({ silent: true, disconnect: false });
       console.log('[Database] Auto-seeding completed.');

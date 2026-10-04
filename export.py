@@ -37,6 +37,7 @@ CORE_CODE_FILES = [
 
     # Middleware
     "backend/middleware/auth.js",
+    "backend/middleware/upload.js",
     "backend/middleware/noSqlSanitize.js",
     "backend/middleware/validate.js",
     "backend/middleware/errorHandler.js",
@@ -44,6 +45,7 @@ CORE_CODE_FILES = [
 
     # Services
     "backend/services/auth.service.js",
+    "backend/services/admin.service.js",
     "backend/services/catalog.service.js",
     "backend/services/library.service.js",
     "backend/services/playlist.service.js",
@@ -53,6 +55,7 @@ CORE_CODE_FILES = [
 
     # Controllers
     "backend/controllers/auth.controller.js",
+    "backend/controllers/admin.controller.js",
     "backend/controllers/catalog.controller.js",
     "backend/controllers/library.controller.js",
     "backend/controllers/playlists.controller.js",
@@ -62,6 +65,7 @@ CORE_CODE_FILES = [
 
     # Routes
     "backend/routes/index.js",
+    "backend/routes/admin.routes.js",
     "backend/routes/auth.routes.js",
     "backend/routes/catalog.routes.js",
     "backend/routes/library.routes.js",

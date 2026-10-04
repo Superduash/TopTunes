@@ -75,7 +75,18 @@ async function optionalAuth(req, res, next) {
   }
 }
 
+async function requireAdmin(req, res, next) {
+  await requireAuth(req, res, (err) => {
+    if (err) return next(err);
+    if (!req.user || req.user.role !== 'admin') {
+      return next(ApiError.forbidden('Admin privileges required for this action.'));
+    }
+    next();
+  });
+}
+
 module.exports = {
   requireAuth,
-  optionalAuth
+  optionalAuth,
+  requireAdmin
 };

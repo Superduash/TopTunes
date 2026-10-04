@@ -23,6 +23,11 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password hash is required'],
     select: false
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
   avatarColor: {
     type: String,
     default: '#ffb224'

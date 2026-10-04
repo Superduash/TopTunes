@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,6 +8,9 @@ const apiRoutes = require('./routes/index');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
+
+// Serve local media storage safely
+app.use('/storage', express.static(path.join(__dirname, '..', 'storage'), { dotfiles: 'allow' }));
 
 // Security Headers (relaxed CSP for local SVG & fonts)
 app.use(helmet({

@@ -21,6 +21,11 @@
         return S.user ? $q.reject({ redirect: '/home' }) : true;
       });
     }];
+    var needAdmin = ['Session', 'Boot', '$q', function (S, Boot, $q) {
+      return Boot.ready().then(function () {
+        return (S.user && S.user.role === 'admin') ? true : $q.reject({ redirect: '/home', info: 'Admin access required.' });
+      });
+    }];
     function view(path, name, ctrl, title, guard, opts) {
       var resolve = { boot: boot };
       if (guard) { resolve.guard = guard; }
@@ -33,6 +38,7 @@
     view('/playlists/:id', 'playlist', 'PlaylistCtrl', 'Playlist');
     view('/albums/:id', 'album', 'AlbumCtrl', 'Album');
     view('/profile', 'profile', 'ProfileCtrl', 'Profile', needUser);
+    view('/admin', 'admin', 'AdminCtrl', 'Catalog Management', needAdmin);
     view('/login', 'login', 'LoginCtrl', 'Log in', guestOnly, { reloadOnSearch: false });
     view('/register', 'register', 'RegisterCtrl', 'Create account', guestOnly);
     $rp.otherwise({ redirectTo: '/home' });
@@ -240,6 +246,27 @@
       },
       getMyStats: function () {
         return $http.get(API_BASE + '/stats/me').then(extract).catch(handleErr);
+      },
+
+      // Admin Song Management
+      adminCreateSong: function (data) {
+        return $http.post(API_BASE + '/admin/songs', data).then(extract).catch(handleErr);
+      },
+      adminUpdateSong: function (id, data) {
+        return $http.patch(API_BASE + '/admin/songs/' + id, data).then(extract).catch(handleErr);
+      },
+      adminDeleteSong: function (id) {
+        return $http.delete(API_BASE + '/admin/songs/' + id).then(extract).catch(handleErr);
+      },
+      adminUploadAudio: function (id, formData) {
+        return $http.post(API_BASE + '/admin/songs/' + id + '/audio', formData, {
+          headers: { 'Content-Type': undefined }
+        }).then(extract).catch(handleErr);
+      },
+      adminUploadCover: function (id, formData) {
+        return $http.post(API_BASE + '/admin/songs/' + id + '/cover', formData, {
+          headers: { 'Content-Type': undefined }
+        }).then(extract).catch(handleErr);
       }
     };
   }]);
@@ -551,6 +578,7 @@
     }
 
     S.key = function () { return S.user ? 'u:' + S.user.id : 'guest'; };
+    S.isAdmin = function () { return !!(S.user && S.user.role === 'admin'); };
 
     function enter(u) {
       S.user = u;
@@ -610,8 +638,8 @@
     };
   }]);
 
-  /* ================= Player (simulated playback with API sync) ================= */
-  app.factory('Player', ['$interval', '$timeout', 'Library', 'Session', 'Api', 'Toast', function ($interval, $timeout, Library, Session, Api, Toast) {
+  /* ================= Player (HTML5 audio playback with API sync) ================= */
+  app.factory('Player', ['$interval', '$timeout', '$rootScope', 'Library', 'Session', 'Api', 'Toast', function ($interval, $timeout, $rootScope, Library, Session, Api, Toast) {
     var P = {
       queue: [], original: null, index: -1, current: null,
       playing: false, position: 0, shuffle: false, repeat: 'off',
@@ -619,6 +647,33 @@
     };
     var timer = null, pending = 0, TICK = 250;
     var saveQueueTimeout = null;
+
+    var audio = new Audio();
+
+    audio.ontimeupdate = function () {
+      if (P.playing && P.current && P.current.audioUrl) {
+        $rootScope.$applyAsync(function () {
+          P.position = audio.currentTime;
+          if (audio.duration && !isNaN(audio.duration)) {
+            P.current.duration = audio.duration;
+          }
+        });
+      }
+    };
+
+    audio.onended = function () {
+      $rootScope.$applyAsync(function () {
+        finished();
+      });
+    };
+
+    audio.onerror = function () {
+      $rootScope.$applyAsync(function () {
+        P.playing = false;
+        stopTimer();
+        Toast.error('Audio playback error loading "' + (P.current ? P.current.title : 'song') + '".');
+      });
+    };
 
     function debouncedSaveQueue() {
       if (Session.user) {
@@ -649,13 +704,41 @@
 
     function tick() {
       if (!P.playing || !P.current) { return; }
-      P.position += TICK / 1000; pending += TICK / 1000;
+      if (!P.current.audioUrl) {
+        P.position += TICK / 1000;
+        if (P.position >= P.current.duration) { finished(); }
+      }
+      pending += TICK / 1000;
       if (pending >= 15) { flush(); }
-      if (P.position >= P.current.duration) { finished(); }
     }
 
     function load(i) {
-      P.index = i; P.current = P.queue[i]; P.position = 0; P.playing = true;
+      P.index = i; P.current = P.queue[i]; P.position = 0;
+      if (!P.current) { return; }
+
+      if (P.current.audioUrl) {
+        audio.src = P.current.audioUrl;
+        audio.currentTime = 0;
+        audio.volume = (P.volume || 80) / 100;
+        audio.muted = !!P.muted;
+        var playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.then(function () {
+            P.playing = true;
+          }).catch(function () {
+            P.playing = false;
+            Toast.info('Playback paused or audio unavailable.');
+          });
+        } else {
+          P.playing = true;
+        }
+      } else {
+        audio.pause();
+        audio.src = '';
+        P.playing = false;
+        Toast.info('"' + P.current.title + '" has no local audio file attached.');
+      }
+
       Library.recordPlay(P.current);
       startTimer();
       debouncedSaveQueue();
@@ -663,7 +746,17 @@
 
     function finished() {
       flush();
-      if (P.repeat === 'one') { P.position = 0; return; }
+      if (P.current && P.current.audioUrl) {
+        audio.pause();
+      }
+      if (P.repeat === 'one') {
+        P.position = 0;
+        if (P.current && P.current.audioUrl) {
+          audio.currentTime = 0;
+          audio.play().catch(function () {});
+        }
+        return;
+      }
       if (P.index < P.queue.length - 1) { load(P.index + 1); }
       else if (P.repeat === 'all') { load(0); }
       else { P.position = 0; P.playing = false; stopTimer(); Toast.info('Reached the end of your queue.'); }
@@ -693,14 +786,30 @@
 
     P.toggle = function () {
       if (!P.current) { return; }
+      if (!P.current.audioUrl) {
+        Toast.info('"' + P.current.title + '" has no audio file attached.');
+        P.playing = false;
+        stopTimer();
+        return;
+      }
       P.playing = !P.playing;
-      if (P.playing) { startTimer(); } else { stopTimer(); flush(); }
+      if (P.playing) {
+        audio.play().catch(function () {});
+        startTimer();
+      } else {
+        audio.pause();
+        stopTimer();
+        flush();
+      }
       debouncedSaveQueue();
     };
 
     P.seek = function (v) {
       if (P.current) {
         P.position = Math.max(0, Math.min(+v || 0, P.current.duration - 1));
+        if (P.current.audioUrl) {
+          audio.currentTime = P.position;
+        }
         debouncedSaveQueue();
       }
     };
@@ -717,6 +826,9 @@
       if (!P.current) { return; }
       flush();
       if (P.position > 3 || (P.index === 0 && P.repeat !== 'all')) { P.position = 0; return; }
+      if (P.current.audioUrl) {
+        audio.currentTime = 0;
+      }
       load(P.index > 0 ? P.index - 1 : P.queue.length - 1);
     };
 
@@ -776,12 +888,16 @@
       P.muted = !P.muted;
       if (P.muted) { lastVol = P.volume || 80; P.volume = 0; }
       else { P.volume = lastVol || 80; }
+      audio.volume = (P.volume || 0) / 100;
+      audio.muted = P.muted;
       debouncedSaveQueue();
     };
     P.setVolume = function (v) {
       P.volume = +v;
       P.muted = P.volume === 0;
       if (P.volume > 0) { lastVol = P.volume; }
+      audio.volume = (P.volume || 0) / 100;
+      audio.muted = P.muted;
       debouncedSaveQueue();
     };
 
@@ -825,10 +941,28 @@
       link: function (scope) {
         scope.$watch('item', function (it) {
           if (!it) { return; }
+          if (it.coverUrl) {
+            scope.style = { backgroundImage: 'url(' + it.coverUrl + ')', backgroundSize: 'cover', backgroundPosition: 'center' };
+            scope.shape = 0;
+            return;
+          }
           var seed = hash(String(it.id || it.name || 'x'));
           var hue = it.hue != null ? it.hue : seed % 360;
           scope.shape = it.shape != null ? it.shape : seed % 4;
           scope.style = { background: 'linear-gradient(140deg, hsl(' + hue + ',68%,58%), hsl(' + ((hue + 48) % 360) + ',62%,30%))' };
+        });
+      }
+    };
+  });
+
+  app.directive('ttFileSelect', function () {
+    return {
+      link: function (scope, el, attrs) {
+        el.on('change', function (e) {
+          var file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+          scope.$apply(function () {
+            scope.$eval(attrs.ttFileSelect, { $file: file });
+          });
         });
       }
     };
@@ -1108,6 +1242,160 @@
         $loc.url('/home');
       }).catch(function (e) { vm.error = e.message || 'Could not create your account. Try again.'; })
         ['finally'](function () { vm.busy = false; });
+    };
+  app.controller('AdminCtrl', ['$scope', 'Catalog', 'Api', 'Toast', function ($scope, Catalog, Api, Toast) {
+    var vm = this;
+    vm.catalog = Catalog;
+    vm.busy = false;
+    vm.editingSong = null;
+    vm.deletingSong = null;
+
+    vm.newSong = {
+      title: '',
+      artist: '',
+      album: '',
+      genre: 'Pop',
+      duration: 180,
+      available: true
+    };
+    vm.audioFile = null;
+    vm.coverFile = null;
+
+    vm.setAudioFile = function (file) {
+      $scope.$applyAsync(function () {
+        vm.audioFile = file;
+      });
+    };
+
+    vm.setCoverFile = function (file) {
+      $scope.$applyAsync(function () {
+        vm.coverFile = file;
+      });
+    };
+
+    vm.setEditAudioFile = function (file) {
+      $scope.$applyAsync(function () {
+        vm.editAudioFile = file;
+      });
+    };
+
+    vm.setEditCoverFile = function (file) {
+      $scope.$applyAsync(function () {
+        vm.editCoverFile = file;
+      });
+    };
+
+    vm.createSong = function (form) {
+      if (form && form.$invalid) { return; }
+      if (!vm.newSong.title || !vm.newSong.artist) {
+        Toast.error('Title and Artist are required.');
+        return;
+      }
+      vm.busy = true;
+      Api.adminCreateSong(vm.newSong).then(function (res) {
+        var created = res.song;
+        var uploadPromises = [];
+
+        if (vm.audioFile) {
+          var fdAudio = new FormData();
+          fdAudio.append('audio', vm.audioFile);
+          uploadPromises.push(Api.adminUploadAudio(created.id, fdAudio));
+        }
+        if (vm.coverFile) {
+          var fdCover = new FormData();
+          fdCover.append('cover', vm.coverFile);
+          uploadPromises.push(Api.adminUploadCover(created.id, fdCover));
+        }
+
+        return Promise.all(uploadPromises).then(function () {
+          Toast.success('Song "' + created.title + '" added to catalog.');
+          vm.resetForm(form);
+          return Catalog.load();
+        });
+      }).catch(function (err) {
+        Toast.error(err.message || 'Could not create song.');
+      }).finally(function () {
+        vm.busy = false;
+      });
+    };
+
+    vm.resetForm = function (form) {
+      vm.newSong = { title: '', artist: '', album: '', genre: 'Pop', duration: 180, available: true };
+      vm.audioFile = null;
+      vm.coverFile = null;
+      var aInp = document.getElementById('adminAudioInput');
+      var cInp = document.getElementById('adminCoverInput');
+      if (aInp) aInp.value = '';
+      if (cInp) cInp.value = '';
+      if (form) { form.$setPristine(); form.$setUntouched(); }
+    };
+
+    vm.startEdit = function (s) {
+      vm.editingSong = angular.copy(s);
+      vm.editAudioFile = null;
+      vm.editCoverFile = null;
+    };
+
+    vm.cancelEdit = function () {
+      vm.editingSong = null;
+      vm.editAudioFile = null;
+      vm.editCoverFile = null;
+    };
+
+    vm.saveEdit = function () {
+      if (!vm.editingSong || !vm.editingSong.title || !vm.editingSong.artist) {
+        Toast.error('Title and Artist are required.');
+        return;
+      }
+      vm.busy = true;
+      Api.adminUpdateSong(vm.editingSong.id, vm.editingSong).then(function (res) {
+        var updated = res.song;
+        var uploadPromises = [];
+
+        if (vm.editAudioFile) {
+          var fdAudio = new FormData();
+          fdAudio.append('audio', vm.editAudioFile);
+          uploadPromises.push(Api.adminUploadAudio(updated.id, fdAudio));
+        }
+        if (vm.editCoverFile) {
+          var fdCover = new FormData();
+          fdCover.append('cover', vm.editCoverFile);
+          uploadPromises.push(Api.adminUploadCover(updated.id, fdCover));
+        }
+
+        return Promise.all(uploadPromises).then(function () {
+          Toast.success('Updated song "' + updated.title + '".');
+          vm.editingSong = null;
+          return Catalog.load();
+        });
+      }).catch(function (err) {
+        Toast.error(err.message || 'Could not update song.');
+      }).finally(function () {
+        vm.busy = false;
+      });
+    };
+
+    vm.confirmDelete = function (s) {
+      vm.deletingSong = s;
+    };
+
+    vm.cancelDelete = function () {
+      vm.deletingSong = null;
+    };
+
+    vm.deleteSong = function () {
+      if (!vm.deletingSong) return;
+      vm.busy = true;
+      var s = vm.deletingSong;
+      Api.adminDeleteSong(s.id).then(function () {
+        Toast.success('Removed "' + s.title + '" from catalog.');
+        vm.deletingSong = null;
+        return Catalog.load();
+      }).catch(function (err) {
+        Toast.error(err.message || 'Could not delete song.');
+      }).finally(function () {
+        vm.busy = false;
+      });
     };
   }]);
 })();

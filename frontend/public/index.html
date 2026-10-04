@@ -59,6 +59,9 @@
         <a ng-repeat="n in app.primaryNav" ng-href="#{{n.path}}" ng-class="{on: app.isActive(n.path)}" ng-attr-aria-current="{{app.isActive(n.path) ? 'page' : undefined}}">
           <svg class="i"><use ng-attr-href="#i-{{n.icon}}"/></svg><span>{{n.label}}</span>
         </a>
+        <a href="#/admin" ng-if="app.session.isAdmin()" ng-class="{on: app.isActive('/admin')}" aria-label="Admin catalog management">
+          <svg class="i"><use href="#i-edit"/></svg><span>Admin</span>
+        </a>
       </nav>
 
       <div class="side-playlists" ng-if="app.lib.state.playlists.length">
@@ -79,6 +82,9 @@
     <nav class="mobile-nav" aria-label="Mobile navigation">
       <a ng-repeat="n in app.nav" ng-href="#{{n.path}}" ng-class="{on: app.isActive(n.path)}" ng-attr-aria-current="{{app.isActive(n.path) ? 'page' : undefined}}">
         <svg class="i"><use ng-attr-href="#i-{{n.icon}}"/></svg><span>{{n.label}}</span>
+      </a>
+      <a href="#/admin" ng-if="app.session.isAdmin()" ng-class="{on: app.isActive('/admin')}" aria-label="Admin catalog management">
+        <svg class="i"><use href="#i-edit"/></svg><span>Admin</span>
       </a>
     </nav>
 
@@ -336,8 +342,10 @@
       </div>
       <div class="empty" ng-if="!vm.trending().length">
         <svg class="i empty-i"><use href="#i-note"/></svg>
-        <strong>No songs in {{vm.genre}} yet</strong>
-        <p>Try selecting another genre above or select All.</p>
+        <strong ng-if="!vm.genre">Catalog is ready for audio uploads</strong>
+        <strong ng-if="vm.genre">No songs in {{vm.genre}} yet</strong>
+        <p ng-if="!vm.genre">No songs in the catalog yet. <a href="#/login" ng-if="!vm.session.user">Sign in</a><a href="#/admin" ng-if="vm.session.isAdmin()">Open Admin Panel</a> to add local audio tracks.</p>
+        <p ng-if="vm.genre">Try selecting another genre above or select All.</p>
       </div>
     </section>
 
@@ -843,6 +851,176 @@
 
         <div class="auth-footer">
           <p class="hint">Already registered? <a href="#/login">Log in</a>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</script>
+
+<script type="text/ng-template" id="admin.html">
+  <section class="page admin-page">
+    <header class="page-head">
+      <h1>Catalog Management</h1>
+      <p class="lede">Manage system songs, upload audio files, and customize cover artwork.</p>
+    </header>
+
+    <div class="admin-grid" style="display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 28px; align-items: start;">
+      <!-- Add New Song Card -->
+      <div class="card" style="background: var(--surface-1, #161a29); border-radius: 12px; padding: 24px; border: 1px solid var(--border, rgba(255,255,255,0.08));">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px; color: #fff;">Add New Song</h2>
+        <form name="fNew" novalidate ng-submit="vm.createSong(fNew)">
+          <div class="field" style="margin-bottom: 14px;">
+            <label for="adm-title" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Song Title *</label>
+            <input id="adm-title" name="title" ng-model="vm.newSong.title" required placeholder="e.g. Midnight Drive" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;" ng-disabled="vm.busy">
+          </div>
+
+          <div class="field" style="margin-bottom: 14px;">
+            <label for="adm-artist" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Artist *</label>
+            <input id="adm-artist" name="artist" ng-model="vm.newSong.artist" required placeholder="e.g. Solar Echoes" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;" ng-disabled="vm.busy">
+          </div>
+
+          <div class="field" style="margin-bottom: 14px;">
+            <label for="adm-album" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Album (Optional)</label>
+            <input id="adm-album" name="album" ng-model="vm.newSong.album" placeholder="e.g. Nightfall Horizons" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;" ng-disabled="vm.busy">
+          </div>
+
+          <div class="field-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="field">
+              <label for="adm-genre" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Genre</label>
+              <select id="adm-genre" name="genre" ng-model="vm.newSong.genre" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;" ng-disabled="vm.busy">
+                <option ng-repeat="g in vm.catalog.genres" ng-value="g">{{g}}</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="adm-dur" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Duration (sec)</label>
+              <input id="adm-dur" type="number" min="1" name="duration" ng-model="vm.newSong.duration" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;" ng-disabled="vm.busy">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom: 14px;">
+            <label for="adminAudioInput" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Audio File (.mp3, .wav, .m4a)</label>
+            <input id="adminAudioInput" type="file" accept="audio/*,.mp3,.wav,.m4a" tt-file-select="vm.setAudioFile($file)" style="width: 100%; font-size: 0.85rem; color: #cbd5e1;" ng-disabled="vm.busy">
+          </div>
+
+          <div class="field" style="margin-bottom: 18px;">
+            <label for="adminCoverInput" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-2, #a0aec0);">Cover Image (.jpg, .png, .webp)</label>
+            <input id="adminCoverInput" type="file" accept="image/*,.jpg,.jpeg,.png,.webp" tt-file-select="vm.setCoverFile($file)" style="width: 100%; font-size: 0.85rem; color: #cbd5e1;" ng-disabled="vm.busy">
+          </div>
+
+          <button class="btn primary wide" type="submit" ng-disabled="vm.busy" style="width: 100%; padding: 12px; font-weight: 600;">
+            {{vm.busy ? 'Uploading & Creating...' : 'Add Song to Catalog'}}
+          </button>
+        </form>
+      </div>
+
+      <!-- Catalog Table / List -->
+      <div class="admin-catalog-wrap" style="background: var(--surface-1, #161a29); border-radius: 12px; padding: 24px; border: 1px solid var(--border, rgba(255,255,255,0.08));">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: #fff;">Catalog Songs ({{vm.catalog.songs.length}})</h2>
+        </div>
+
+        <div ng-if="!vm.catalog.songs.length" style="padding: 40px 20px; text-align: center; color: var(--text-2, #a0aec0);">
+          <p style="font-size: 1.05rem; margin-bottom: 8px;">No songs in catalog yet.</p>
+          <p style="font-size: 0.9rem;">Use the form on the left to upload real audio tracks into your local catalog.</p>
+        </div>
+
+        <div class="songs-table-wrap" ng-if="vm.catalog.songs.length" style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-2, #a0aec0);">
+                <th style="padding: 10px 8px;">#</th>
+                <th style="padding: 10px 8px;">Track</th>
+                <th style="padding: 10px 8px;">Artist</th>
+                <th style="padding: 10px 8px;">Genre</th>
+                <th style="padding: 10px 8px;">Audio</th>
+                <th style="padding: 10px 8px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="s in vm.catalog.songs" style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 12px 8px; color: var(--text-2, #a0aec0);">{{$index + 1}}</td>
+                <td style="padding: 12px 8px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <tt-cover item="s" class="xs" style="width: 36px; height: 36px; min-width: 36px; border-radius: 6px; overflow: hidden;"></tt-cover>
+                    <div>
+                      <strong style="display: block; color: #fff;">{{s.title}}</strong>
+                      <small style="color: var(--text-2, #a0aec0);">{{s.album || 'Single'}} • {{s.duration | duration}}</small>
+                    </div>
+                  </div>
+                </td>
+                <td style="padding: 12px 8px; color: #cbd5e1;">{{s.artist}}</td>
+                <td style="padding: 12px 8px;"><span class="chip" style="font-size: 0.75rem;">{{s.genre}}</span></td>
+                <td style="padding: 12px 8px;">
+                  <span ng-if="s.audioUrl" class="chip success" style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.75rem; border: 1px solid rgba(16,185,129,0.3);">Local Audio</span>
+                  <span ng-if="!s.audioUrl" class="chip warn" style="background: rgba(245,158,11,0.15); color: #f59e0b; font-size: 0.75rem; border: 1px solid rgba(245,158,11,0.3);">No Audio</span>
+                </td>
+                <td style="padding: 12px 8px; text-align: right;">
+                  <button class="btn small" ng-click="vm.startEdit(s)" style="margin-right: 6px; padding: 4px 10px; font-size: 0.8rem;" aria-label="Edit {{s.title}}">Edit</button>
+                  <button class="btn small danger" ng-click="vm.confirmDelete(s)" style="padding: 4px 10px; font-size: 0.8rem; background: rgba(244,63,94,0.15); color: #f43f5e; border: 1px solid rgba(244,63,94,0.3);" aria-label="Delete {{s.title}}">Delete</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Song Modal -->
+    <div class="modal-backdrop" ng-if="vm.editingSong" style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+      <div class="card" style="background: var(--surface-1, #161a29); border-radius: 12px; padding: 28px; width: 100%; max-width: 480px; border: 1px solid var(--border, rgba(255,255,255,0.12));">
+        <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px; color: #fff;">Edit Song</h2>
+        <form name="fEdit" novalidate ng-submit="vm.saveEdit()">
+          <div class="field" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Title *</label>
+            <input ng-model="vm.editingSong.title" required style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;">
+          </div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Artist *</label>
+            <input ng-model="vm.editingSong.artist" required style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;">
+          </div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Album</label>
+            <input ng-model="vm.editingSong.album" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;">
+          </div>
+          <div class="field-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div class="field">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Genre</label>
+              <select ng-model="vm.editingSong.genre" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;">
+                <option ng-repeat="g in vm.catalog.genres" ng-value="g">{{g}}</option>
+              </select>
+            </div>
+            <div class="field">
+              <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Duration (sec)</label>
+              <input type="number" min="1" ng-model="vm.editingSong.duration" style="width: 100%; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12); color: #fff;">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Replace Audio File (Optional)</label>
+            <input type="file" accept="audio/*,.mp3,.wav,.m4a" tt-file-select="vm.setEditAudioFile($file)" style="width: 100%; font-size: 0.85rem; color: #cbd5e1;">
+          </div>
+          <div class="field" style="margin-bottom: 20px;">
+            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2, #a0aec0);">Replace Cover Image (Optional)</label>
+            <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp" tt-file-select="vm.setEditCoverFile($file)" style="width: 100%; font-size: 0.85rem; color: #cbd5e1;">
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn small" type="button" ng-click="vm.cancelEdit()" ng-disabled="vm.busy">Cancel</button>
+            <button class="btn primary small" type="submit" ng-disabled="vm.busy">{{vm.busy ? 'Saving...' : 'Save Changes'}}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-backdrop" ng-if="vm.deletingSong" style="position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+      <div class="card" style="background: var(--surface-1, #161a29); border-radius: 12px; padding: 28px; width: 100%; max-width: 440px; border: 1px solid rgba(244,63,94,0.3);">
+        <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; color: #f43f5e;">Delete Song</h2>
+        <p style="font-size: 0.95rem; line-height: 1.5; color: #cbd5e1; margin-bottom: 20px;">
+          Are you sure you want to delete <strong>"{{vm.deletingSong.title}}"</strong>?
+          This will safely remove local files and clean up references across user likes, playlists, and queue history.
+        </p>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn small" type="button" ng-click="vm.cancelDelete()" ng-disabled="vm.busy">Cancel</button>
+          <button class="btn small danger" type="button" ng-click="vm.deleteSong()" ng-disabled="vm.busy" style="background: #f43f5e; color: #fff;">{{vm.busy ? 'Deleting...' : 'Confirm Delete'}}</button>
         </div>
       </div>
     </div>

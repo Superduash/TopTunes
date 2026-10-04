@@ -5,6 +5,12 @@ node_modules/
 .env
 .env.local
 
+# Local Media Storage
+storage/audio/*
+!storage/audio/.gitkeep
+storage/covers/*
+!storage/covers/.gitkeep
+
 # Local archive & scratch files
 _archive/
 scratch/
