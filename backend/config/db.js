@@ -1,12 +1,21 @@
+const fs = require('fs');
+const path = require('path');
 const mongoose = require('mongoose');
 const env = require('./env');
 
-let memoryServer = null;
+let persistentServer = null;
+
+// Path for persistent local database (survives restarts)
+const PERSIST_DB_PATH = path.join(__dirname, '..', '..', 'data', 'db');
+const PERSIST_DB_NAME = 'toptunes';
 
 async function connectDB() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
   try {
     const conn = await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 1200,
       autoIndex: true
     });
     console.log(`[Database] MongoDB connected successfully: ${conn.connection.host}/${conn.connection.name}`);
@@ -14,18 +23,42 @@ async function connectDB() {
   } catch (error) {
     if (!env.isProd) {
       console.warn(`\n[Database Warning] Could not connect to local MongoDB at ${env.MONGODB_URI} (${error.message}).`);
-      console.warn(`[Database] Attempting fallback to in-memory MongoDB instance for development...`);
+      console.warn(`[Database] Starting persistent local MongoDB (data will be saved to data/db/)...`);
       try {
         const { MongoMemoryServer } = require('mongodb-memory-server');
-        memoryServer = await MongoMemoryServer.create();
-        const memUri = memoryServer.getUri();
-        const conn = await mongoose.connect(memUri, {
-          autoIndex: true
+
+        // Ensure the persistent data directory exists
+        if (!fs.existsSync(PERSIST_DB_PATH)) {
+          fs.mkdirSync(PERSIST_DB_PATH, { recursive: true });
+          console.log(`[Database] Created persistent data directory: ${PERSIST_DB_PATH}`);
+        }
+
+        persistentServer = await MongoMemoryServer.create({
+          instance: {
+            dbPath: PERSIST_DB_PATH,
+            dbName: PERSIST_DB_NAME,
+            storageEngine: 'wiredTiger'
+          }
         });
-        console.log(`[Database] Connected to in-memory MongoDB at ${memUri}`);
+
+        const persistUri = persistentServer.getUri() + PERSIST_DB_NAME;
+        const conn = await mongoose.connect(persistUri, { autoIndex: true });
+        console.log(`[Database] Connected to persistent local MongoDB (data/db/) — data survives restarts!`);
         return conn;
-      } catch (memError) {
-        console.error(`[Database Error] In-memory MongoDB initialization failed: ${memError.message}`);
+      } catch (persistError) {
+        console.error(`[Database Error] Persistent MongoDB initialization failed: ${persistError.message}`);
+        console.warn(`[Database] Falling back to temporary in-memory instance (data will NOT persist)...`);
+        try {
+          const { MongoMemoryServer } = require('mongodb-memory-server');
+          const tmpServer = await MongoMemoryServer.create();
+          const tmpUri = tmpServer.getUri();
+          const conn = await mongoose.connect(tmpUri, { autoIndex: true });
+          console.warn(`[Database] ⚠️  Connected to TEMPORARY in-memory MongoDB. Data will be LOST on restart!`);
+          persistentServer = tmpServer; // track for cleanup
+          return conn;
+        } catch (tmpError) {
+          console.error(`[Database Error] All fallback attempts failed: ${tmpError.message}`);
+        }
       }
     }
 
@@ -38,10 +71,12 @@ async function connectDB() {
 
 async function disconnectDB() {
   await mongoose.disconnect();
-  if (memoryServer) {
-    await memoryServer.stop();
+  if (persistentServer) {
+    // doCleanup:false = keep data files on disk for next restart
+    await persistentServer.stop({ doCleanup: false });
   }
 }
 
 module.exports = { connectDB, disconnectDB };
+
 

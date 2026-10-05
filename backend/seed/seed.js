@@ -1,11 +1,14 @@
+const mongoose = require('mongoose');
 const { connectDB, disconnectDB } = require('../config/db');
 const { User, Genre } = require('../models');
 const { genres, demoUser, demoAdmin } = require('./seedData');
 
 async function seedDatabase(options = {}) {
   const { silent = false } = options;
-  if (!silent) console.log('\n[Seed] Connecting to database...');
-  await connectDB();
+  if (mongoose.connection.readyState !== 1) {
+    if (!silent) console.log('\n[Seed] Connecting to database...');
+    await connectDB();
+  }
 
   try {
     // 1. Ensure Genres exist

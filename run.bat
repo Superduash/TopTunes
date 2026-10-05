@@ -16,9 +16,6 @@ if not exist node_modules (
     call npm install
 )
 
-echo Opening TopTunes in your default web browser...
-start "" "http://localhost:3000/#/home"
-
 echo.
 echo Launching TopTunes Unified Server...
 npm start

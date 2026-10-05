@@ -11,6 +11,9 @@ storage/audio/*
 storage/covers/*
 !storage/covers/.gitkeep
 
+# Persistent local MongoDB data (local-only, do not commit)
+data/
+
 # Local archive & scratch files
 _archive/
 scratch/

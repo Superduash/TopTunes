@@ -4,6 +4,16 @@ const env = require('./backend/config/env');
 const { connectDB } = require('./backend/config/db');
 const backendApp = require('./backend/app');
 
+function openBrowser(url) {
+  const { exec } = require('child_process');
+  const cmd = process.platform === 'win32'
+    ? `start "" "${url}"`
+    : process.platform === 'darwin'
+    ? `open "${url}"`
+    : `xdg-open "${url}"`;
+  exec(cmd, () => {});
+}
+
 async function startServer() {
   try {
     // 1. Connect to MongoDB
@@ -12,6 +22,11 @@ async function startServer() {
     // 1.1 Auto-seed database to ensure all genres and admin/demo accounts exist
     const seedDatabase = require('./backend/seed/seed');
     await seedDatabase({ silent: true, disconnect: false });
+
+    // 1.2 Auto-restore catalog: rebuilds any Song records from physical files
+    //     that are missing from the DB (e.g. after a DB reset or first run)
+    const restoreCatalog = require('./backend/seed/restore');
+    await restoreCatalog({ silent: false, disconnect: false });
     const server = express();
 
     // 3. Mount Backend Express App (handles /api routes & security middleware)
@@ -40,12 +55,18 @@ async function startServer() {
     // 6. Listen on configured port
     const PORT = env.PORT || 3000;
     server.listen(PORT, () => {
+      const url = `http://localhost:${PORT}/#/home`;
       console.log(`\n==================================================`);
       console.log(`  TopTunes Music Streaming System`);
-      console.log(`  Frontend: http://localhost:${PORT}/#/home`);
+      console.log(`  Frontend: ${url}`);
       console.log(`  API Base: http://localhost:${PORT}/api/health`);
       console.log(`  Environment: ${env.NODE_ENV}`);
       console.log(`==================================================\n`);
+
+      // Open browser only AFTER backend is fully listening
+      if (process.env.AUTO_OPEN !== 'false' && process.env.NODE_ENV !== 'test') {
+        openBrowser(url);
+      }
     });
   } catch (error) {
     console.error('\n[FATAL SERVER INITIALIZATION ERROR]');
